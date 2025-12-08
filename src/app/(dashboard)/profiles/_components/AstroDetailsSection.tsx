@@ -1,0 +1,263 @@
+"use client";
+import React, { useEffect, useRef, useState } from "react";
+import { Edit3 } from "lucide-react";
+import Modal from "./Modal";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+
+type AstroDetailItem = { label: string; value: string };
+interface AstroDetailsSectionProps {
+  astroDetails?: AstroDetailItem[]; // optional initial prop
+}
+
+const API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/self";
+const UPDATE_API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
+
+/** small local token helper to avoid external dependency */
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("authToken");
+}
+
+const defaultItems = (): AstroDetailItem[] => [
+  { label: "Zodiac", value: "" },
+  { label: "Date of Birth", value: "" },
+  { label: "Time of Birth", value: "" },
+  { label: "City of Birth", value: "" },
+  { label: "Manglik", value: "" },
+];
+
+const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails }) => {
+  const [info, setInfo] = useState<AstroDetailItem[]>(astroDetails ?? defaultItems());
+  const [editValues, setEditValues] = useState<AstroDetailItem[]>(astroDetails ?? defaultItems());
+  const [modalOpen, setModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const savingRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const fetchProfile = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = getToken();
+        if (!token) throw new Error("No authentication token found. Please log in.");
+
+        const res = await fetch(API_URL, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error("Failed to fetch profile");
+
+        const data = await res.json();
+        const ad = data?.data?.astroDetails ?? data?.astroDetails ?? {};
+
+        const mapped: AstroDetailItem[] = [
+          { label: "Zodiac", value: ad.zodiacSign ?? "" },
+          { label: "Date of Birth", value: ad.dateOfBirth ?? "" },
+          { label: "Time of Birth", value: ad.timeOfBirth ?? "" },
+          { label: "City of Birth", value: ad.cityOfBirth ?? "" },
+          { label: "Manglik", value: ad.manglik ?? "" },
+        ];
+
+        if (!mountedRef.current) return;
+        setInfo(mapped);
+        setEditValues(mapped);
+      } catch (err: any) {
+        if (!mountedRef.current) return;
+        setError(err.message || "Failed to fetch astro details");
+      } finally {
+        if (mountedRef.current) setLoading(false);
+      }
+    };
+
+    fetchProfile();
+
+    return () => {
+      mountedRef.current = false;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const openEditor = () => {
+    setEditValues(info);
+    setUpdateStatus(null);
+    setModalOpen(true);
+  };
+
+  const handleInputChange = (index: number, value: string) => {
+    setEditValues((prev) => {
+      const next = prev.map((it, i) => (i === index ? { ...it, value } : it));
+      // schedule debounce autosave
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => autoSaveAstro(next), 900);
+      return next;
+    });
+  };
+
+  const autoSaveAstro = async (values: AstroDetailItem[]) => {
+    try {
+      const token = getToken();
+      if (!token) return;
+
+      const body = {
+        astroDetails: {
+          zodiacSign: values.find((v) => v.label === "Zodiac")?.value ?? "",
+          dateOfBirth: values.find((v) => v.label === "Date of Birth")?.value ?? "",
+          timeOfBirth: values.find((v) => v.label === "Time of Birth")?.value ?? "",
+          cityOfBirth: values.find((v) => v.label === "City of Birth")?.value ?? "",
+          manglik: values.find((v) => v.label === "Manglik")?.value ?? "",
+        },
+      };
+
+      const res = await fetch(UPDATE_API_URL, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        // don't spam user with autosave errors, log instead
+        const text = await res.text().catch(() => "Auto-save failed");
+        console.warn("Auto-save failed:", text);
+        return;
+      }
+
+      // optimistic update of displayed info
+      setInfo(values);
+      setUpdateStatus("Changes auto-saved");
+      setTimeout(() => setUpdateStatus(null), 1400);
+    } catch (err: any) {
+      console.error("Auto-save error:", err?.message ?? err);
+    }
+  };
+
+  const handleSave = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setUpdateStatus(null);
+
+    try {
+      const token = getToken();
+      if (!token) throw new Error("No authentication token found. Please log in.");
+
+      const body = {
+        astroDetails: {
+          zodiacSign: editValues.find((v) => v.label === "Zodiac")?.value ?? "",
+          dateOfBirth: editValues.find((v) => v.label === "Date of Birth")?.value ?? "",
+          timeOfBirth: editValues.find((v) => v.label === "Time of Birth")?.value ?? "",
+          cityOfBirth: editValues.find((v) => v.label === "City of Birth")?.value ?? "",
+          manglik: editValues.find((v) => v.label === "Manglik")?.value ?? "",
+        },
+      };
+
+      const res = await fetch(UPDATE_API_URL, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "Save failed");
+        throw new Error(txt || "Save failed");
+      }
+
+      // success
+      setInfo(editValues);
+      setModalOpen(false);
+      setUpdateStatus("Astro details saved successfully!");
+      setTimeout(() => setUpdateStatus(null), 2000);
+    } catch (err: any) {
+      setUpdateStatus(err.message || "Save failed");
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  if (loading) {
+    return <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm text-gray-600">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm text-red-500">{error}</div>;
+  }
+
+  return (
+    <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm">
+      {updateStatus && (
+        <div className={`mb-4 p-2 rounded ${updateStatus.toLowerCase().includes("saved") ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+          {updateStatus}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">Astro Details</h3>
+        <Edit3 className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" onClick={openEditor} />
+      </div>
+
+      <div className="space-y-2">
+        {info.map((item, i) => (
+          <div key={i} className="flex text-sm text-gray-700">
+            <div className="w-1/2 flex items-center text-gray-600">
+              <span>{item.label}</span>
+              <span className="ml-1">:</span>
+            </div>
+            <div className="w-1/2 font-medium">{item.value || "Not specified"}</div>
+          </div>
+        ))}
+      </div>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <div className="mb-4">
+          <h2 className="text-xl font-Lato text-gray-900">Edit Astro Details</h2>
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSave();
+          }}
+        >
+          <div className="mb-4 w-full space-y-3">
+            {editValues.map((item, i) => (
+              <div key={i}>
+                <Label className="text-sm font-Inter text-gray-700 mb-1 block">{item.label}</Label>
+                <input
+                  className="w-full rounded-md border border-gray-300 p-2 font-Inter bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-700"
+                  value={item.value ?? ""}
+                  onChange={(e) => handleInputChange(i, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+              onClick={() => {
+                setEditValues(info);
+                setModalOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-rose-700 hover:bg-rose-800 text-white">
+              Save
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+export default AstroDetailsSection;
