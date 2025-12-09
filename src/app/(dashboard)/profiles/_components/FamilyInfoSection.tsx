@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Edit3 } from "lucide-react";
 import Modal from "./Modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,6 +25,28 @@ const defaultFamilyInfo = (): FamilyInfoItem[] => [
   { label: "Sister", value: "" },
   { label: "Family Based Out of", value: "" },
 ];
+
+// ===============================================
+// CUSTOM EDIT ICON (same everywhere)
+// ===============================================
+const EditIconRounded = (props: any) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6B7280"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="cursor-pointer hover:stroke-gray-700 transition"
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+    <path d="M12 8L8 12L7 16L11 15L15 11" />
+    <path d="M14 6L18 10" />
+  </svg>
+);
 
 const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
   familyInfo = defaultFamilyInfo(),
@@ -98,6 +119,7 @@ const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
   const handleSave = async () => {
     if (saveLock.current) return;
     saveLock.current = true;
+
     setUpdateStatus(null);
 
     try {
@@ -180,10 +202,11 @@ const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
       {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Family</h3>
-        <Edit3
-          className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600"
-          onClick={handleEdit}
-        />
+
+        {/* UPDATED ICON */}
+        <div onClick={handleEdit}>
+          <EditIconRounded />
+        </div>
       </div>
 
       {/* TWO-COLUMN VIEW */}

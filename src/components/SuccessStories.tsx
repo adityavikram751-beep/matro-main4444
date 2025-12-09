@@ -1,6 +1,7 @@
 'use client';
 import { Card, CardContent } from '@/components/ui/card';
 import Image from 'next/image';
+
 export default function SuccessStories() {
   const stories = [
     {
@@ -25,9 +26,11 @@ export default function SuccessStories() {
       year: "2023"
     }
   ];
+
   return (
-    <section className="py-16 lg:py-24 ">
+    <section id="success-stories" className="py-16 lg:py-24">   {/* ⭐ ADD KIYA */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
         <div className="text-center mb-16">
           <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
             Success Stories
@@ -36,10 +39,14 @@ export default function SuccessStories() {
             Real couples who found their perfect match through our platform
           </p>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {stories.map((story) => (
-            <Card key={story.id} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-0  backdrop-blur-sm"
-            style={{backgroundColor:"rgba(255, 255, 241, 1)"}}>
+            <Card
+              key={story.id}
+              className="overflow-hidden hover:shadow-lg transition-all duration-300 border-0 backdrop-blur-sm"
+              style={{ backgroundColor: "rgba(255, 255, 241, 1)" }}
+            >
               <div className="aspect-video relative">
                 <Image
                   src={story.img}
@@ -49,20 +56,23 @@ export default function SuccessStories() {
                   className="w-full h-full object-cover"
                 />
               </div>
+
               <CardContent className="p-6 space-y-4">
-               
                 <p className="text-gray-600 font-Lato text-sm leading-relaxed">
                   &quot;{story.quote}&quot;
                 </p>
+
                 <div className="flex items-center justify-between pt-4 border-t">
                   <div>
                     <p className="font-semibold text-gray-900">{story.names}</p>
                   </div>
                 </div>
               </CardContent>
+
             </Card>
           ))}
         </div>
+
       </div>
     </section>
   );

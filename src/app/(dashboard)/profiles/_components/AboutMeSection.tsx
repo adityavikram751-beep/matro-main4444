@@ -1,7 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Edit3 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import Modal from "./Modal";
@@ -14,6 +12,28 @@ const API_URL =
   "https://matrimonial-backend-7ahc.onrender.com/api/profile/self";
 const UPDATE_API_URL =
   "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
+
+// =========================
+// CUSTOM EDIT ICON (your screenshot)
+// =========================
+const EditIconRounded = (props: any) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6B7280"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="cursor-pointer hover:stroke-gray-700 transition"
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+    <path d="M12 8L8 12L7 16L11 15L15 11" />
+    <path d="M14 6L18 10" />
+  </svg>
+);
 
 const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
   const [about, setAbout] = useState(aboutMe || "");
@@ -137,10 +157,10 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">About me</h3>
 
-        <Edit3
-          className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-700 transition"
-          onClick={openEdit}
-        />
+        {/* Custom Icon */}
+        <div onClick={openEdit}>
+          <EditIconRounded />
+        </div>
       </div>
 
       {/* Text */}

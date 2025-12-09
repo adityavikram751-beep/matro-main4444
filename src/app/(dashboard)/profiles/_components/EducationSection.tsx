@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Edit3 } from "lucide-react";
 import Modal from "./Modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,7 +25,31 @@ const defaultEducation = (): EducationItem[] => [
   { label: "School Stream", value: "" },
 ];
 
-const EducationSection: React.FC<EducationSectionProps> = ({ education = defaultEducation() }) => {
+// ===============================================
+// CUSTOM EDIT ICON (same screenshot icon)
+// ===============================================
+const EditIconRounded = (props: any) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6B7280"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="cursor-pointer hover:stroke-gray-700 transition"
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+    <path d="M12 8L8 12L7 16L11 15L15 11" />
+    <path d="M14 6L18 10" />
+  </svg>
+);
+
+const EducationSection: React.FC<EducationSectionProps> = ({
+  education = defaultEducation(),
+}) => {
   const [info, setInfo] = useState<EducationItem[]>(education);
   const [editValues, setEditValues] = useState<EducationItem[]>(education);
   const [modalOpen, setModalOpen] = useState(false);
@@ -164,12 +187,13 @@ const EducationSection: React.FC<EducationSectionProps> = ({ education = default
         </div>
       )}
 
+      {/* HEADER WITH UPDATED ICON */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Education</h3>
-        <Edit3
-          className="h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600"
-          onClick={openEdit}
-        />
+
+        <div onClick={openEdit}>
+          <EditIconRounded />
+        </div>
       </div>
 
       <div className="space-y-3">

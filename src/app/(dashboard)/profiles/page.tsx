@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { useEffect, useState, useRef } from 'react';
 import ProfilePhotoSection from '@/app/(dashboard)/profiles/_components/ProfilePhotoSection';
@@ -28,9 +28,12 @@ const ProfilePage: React.FC = () => {
   const { profileImage, setProfileImage } = useUser();
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const [profileComplete, setProfileComplete] = useState<boolean>(false);
-  
-  // Local state for immediate preview
+
   const [displayImage, setDisplayImage] = useState<string | null>(null);
+
+  // ⭐ NEW — Wishlist + Not Now counts
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const [notNowCount, setNotNowCount] = useState(0);
 
   const autoSaveProfile = (updatedProfile: any) => {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -73,6 +76,7 @@ const ProfilePage: React.FC = () => {
     }
   }, []);
 
+  // ⭐ Fetch profile details
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
@@ -94,7 +98,6 @@ const ProfilePage: React.FC = () => {
 
         const fullProfile = data.data || data;
 
-        // Normalize profile image
         if (fullProfile.profileImage) {
           if (typeof fullProfile.profileImage === "object") {
             if (fullProfile.profileImage.filename) {
@@ -108,7 +111,6 @@ const ProfilePage: React.FC = () => {
         setProfile(fullProfile);
         setEditableProfile(fullProfile);
 
-        // Set the display image
         const imageUrl = fullProfile.profileImage || DEFAULT_PROFILE_IMAGE;
         setDisplayImage(imageUrl);
         setProfileImage(imageUrl);
@@ -123,26 +125,58 @@ const ProfilePage: React.FC = () => {
     fetchProfile();
   }, [setProfileImage]);
 
+  // ⭐ NEW — Fetch Wishlist + Not Now counts
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      try {
+        // Wishlist
+        const res1 = await fetch(
+          "https://matrimonial-backend-7ahc.onrender.com/api/like/ShortlistCount",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data1 = await res1.json();
+        if (data1.success) setWishlistCount(data1.count);
+
+        // Not Now
+        const res2 = await fetch(
+          "https://matrimonial-backend-7ahc.onrender.com/api/cross/BlockedCount",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data2 = await res2.json();
+        if (data2.success) setNotNowCount(data2.count);
+
+      } catch (err) {
+        console.error("Count fetch error:", err);
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
+  // ⭐ NEW — Stat mapping
+  const mapStats = () => [
+    { number: wishlistCount.toString(), label: 'Wishlist', color: 'bg-yellow-50 text-yellow-600' },
+    { number: notNowCount.toString(), label: 'Not-Now', color: 'bg-pink-50 text-pink-600' },
+  ];
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setUpdateStatus('Please select a valid image file');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setUpdateStatus('Image size should be less than 5MB');
       return;
     }
 
-    // Create blob URL for immediate preview
     const previewUrl = URL.createObjectURL(file);
-    
-    // Set display image immediately for instant feedback
     setDisplayImage(previewUrl);
 
     setPhotoUploading(true);
@@ -155,107 +189,61 @@ const ProfilePage: React.FC = () => {
       const formData = new FormData();
       formData.append("profileImage", file);
 
-      console.log('Uploading image...');
-
       const response = await fetch("https://matrimonial-backend-7ahc.onrender.com/api/basic-details", {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
-      console.log('Response status:', response.status);
-
-      // Check if response is JSON
       const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response:', text.substring(0, 200));
-        throw new Error('Server returned invalid response. Please try again.');
+      if (!contentType?.includes('application/json')) {
+        throw new Error('Invalid server response');
       }
 
       const data = await response.json();
-      console.log('Upload response:', data);
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Upload failed');
-      }
+      if (!response.ok) throw new Error(data.message || 'Upload failed');
 
-      const uploadedUrl = data.data?.profileImage || data.profileImage;
+      let uploadedUrl = data.data?.profileImage || data.profileImage;
 
-      if (!uploadedUrl) {
-        console.error('Full response:', data);
-        throw new Error("Profile image URL missing from response");
-      }
-
-      console.log('Raw uploaded URL:', uploadedUrl);
-
-      // Normalize the uploaded URL
-      let finalUrl = uploadedUrl;
       if (typeof uploadedUrl === "object") {
         if (uploadedUrl.filename) {
-          finalUrl = `https://matrimonial-backend-7ahc.onrender.com/uploads/${uploadedUrl.filename}`;
+          uploadedUrl = `https://matrimonial-backend-7ahc.onrender.com/uploads/${uploadedUrl.filename}`;
         } else if (uploadedUrl.url) {
-          finalUrl = `https://matrimonial-backend-7ahc.onrender.com${uploadedUrl.url}`;
+          uploadedUrl = `https://matrimonial-backend-7ahc.onrender.com${uploadedUrl.url}`;
         }
       }
 
-      console.log('Final normalized URL:', finalUrl);
-
-      // Clean up blob URL
       URL.revokeObjectURL(previewUrl);
 
-      // Update all states with the final URL
-      setDisplayImage(finalUrl);
-      setProfileImage(finalUrl);
-      localStorage.setItem("profileImage", finalUrl);
+      setDisplayImage(uploadedUrl);
+      setProfileImage(uploadedUrl);
+      localStorage.setItem("profileImage", uploadedUrl);
 
-      // Update profile states
-      setProfile((prev: any) => ({
-        ...prev,
-        profileImage: finalUrl,
-      }));
+      setProfile((prev: any) => ({ ...prev, profileImage: uploadedUrl }));
+      setEditableProfile((prev: any) => ({ ...prev, profileImage: uploadedUrl }));
 
-      setEditableProfile((prev: any) => ({
-        ...prev,
-        profileImage: finalUrl,
-      }));
-
-      // Update userData in localStorage to sync with Navbar
       const userData = localStorage.getItem('userData');
       if (userData) {
         try {
           const parsed = JSON.parse(userData);
-          parsed.profileImage = finalUrl;
-          if (parsed.basicInfo) {
-            parsed.basicInfo.profileImage = finalUrl;
-          }
+          parsed.profileImage = uploadedUrl;
+          if (parsed.basicInfo) parsed.basicInfo.profileImage = uploadedUrl;
           localStorage.setItem('userData', JSON.stringify(parsed));
-          console.log('Updated userData with new image');
-        } catch (e) {
-          console.error('Error updating userData:', e);
-        }
+        } catch { }
       }
 
-      // Trigger a custom event to notify other components (like Navbar)
-      window.dispatchEvent(new CustomEvent('profileImageUpdated', { 
-        detail: { profileImage: finalUrl } 
+      window.dispatchEvent(new CustomEvent('profileImageUpdated', {
+        detail: { profileImage: uploadedUrl }
       }));
 
       setUpdateStatus("Profile photo updated successfully!");
-      
-      // Clear success message after 3 seconds
       setTimeout(() => setUpdateStatus(null), 3000);
 
     } catch (err: any) {
       console.error("Upload error:", err);
       setUpdateStatus(err.message || "Failed to upload photo");
-      
-      // Revert to previous image on error
       setDisplayImage(profile?.profileImage || DEFAULT_PROFILE_IMAGE);
-      
-      // Clean up blob URL
       URL.revokeObjectURL(previewUrl);
     } finally {
       setPhotoUploading(false);
@@ -297,16 +285,20 @@ const ProfilePage: React.FC = () => {
   ];
 
   const mapLifestyleInfo = (p: any) => [
-    { label: 'Habits', items: [
+    {
+      label: 'Habits', items: [
         `Diet - ${p?.lifestyleHobbies?.diet || ''}`,
         `Drinking - ${normalizeEnum(p?.lifestyleHobbies?.drinking)}`,
         `Smoking - ${normalizeEnum(p?.lifestyleHobbies?.smoking)}`,
         `Open to pets - ${p?.lifestyleHobbies?.openToPets || ''}`,
-    ]},
-    { label: 'Assets', items: [
+      ]
+    },
+    {
+      label: 'Assets', items: [
         `Own a House - ${p?.lifestyleHobbies?.ownHouse || ''}`,
         `Own a Car - ${p?.lifestyleHobbies?.ownCar || ''}`,
-    ]},
+      ]
+    },
     { label: 'Food I cook', items: p?.lifestyleHobbies?.foodICook || [] },
     { label: 'Hobbies', items: p?.lifestyleHobbies?.hobbies || [] },
     { label: 'Interests', items: p?.lifestyleHobbies?.interests || [] },
@@ -339,11 +331,6 @@ const ProfilePage: React.FC = () => {
     { label: 'Occupation', value: p?.careerDetails?.occupation || '' },
     { label: 'Company', value: p?.careerDetails?.company || '' },
     { label: 'Annual Income', value: p?.careerDetails?.annualIncome || '' },
-  ];
-
-  const mapStats = (p: any) => [
-    { number: '0', label: 'Wishlist', color: 'bg-yellow-50 text-yellow-600' },
-    { number: '0', label: 'Not-Now', color: 'bg-pink-50 text-pink-600' },
   ];
 
   if (loading) {
@@ -384,7 +371,9 @@ const ProfilePage: React.FC = () => {
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <StatsSection stats={mapStats(profile)} />
+            {/* ⭐ Stats now shows LIVE API values */}
+            <StatsSection stats={mapStats()} />
+
             <BasicInfoSection basicInfo={mapBasicInfo(profile)} />
             <ReligiousInfoSection religiousInfo={mapReligiousInfo(profile)} />
             <FamilyInfoSection familyInfo={mapFamilyInfo(profile)} />

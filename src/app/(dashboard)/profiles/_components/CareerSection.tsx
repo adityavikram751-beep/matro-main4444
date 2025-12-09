@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Edit3 } from "lucide-react";
 import Modal from "./Modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,6 +15,28 @@ const UPDATE_API_URL =
 
 const getToken = () =>
   typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+
+// ===============================================
+// CUSTOM EDIT ICON (same as screenshot)
+// ===============================================
+const EditIconRounded = (props: any) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6B7280"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="cursor-pointer hover:stroke-gray-700 transition"
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+    <path d="M12 8L8 12L7 16L11 15L15 11" />
+    <path d="M14 6L18 10" />
+  </svg>
+);
 
 const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
   const [info, setInfo] = useState<CareerItem[]>(career);
@@ -67,7 +88,9 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
 
   // ---------------------- INPUT HANDLER ---------------------
   const handleInputChange = (i: number, value: string) => {
-    setEditValues((prev) => prev.map((it, idx) => (idx === i ? { ...it, value } : it)));
+    setEditValues((prev) =>
+      prev.map((it, idx) => (idx === i ? { ...it, value } : it))
+    );
   };
 
   // -------------------------- SAVE --------------------------
@@ -100,7 +123,7 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
 
       if (!res.ok) throw new Error("Error updating career details");
 
-      setInfo(editValues); // instantly update UI
+      setInfo(editValues);
       setModalOpen(false);
       setUpdateStatus("Career details updated successfully!");
     } catch (err: any) {
@@ -142,13 +165,16 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
 
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Career</h3>
-        <Edit3
-          className="h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600"
+
+        {/* UPDATED ICON */}
+        <div
           onClick={() => {
             setEditValues(info);
             setModalOpen(true);
           }}
-        />
+        >
+          <EditIconRounded />
+        </div>
       </div>
 
       <div className="space-y-3">

@@ -1,19 +1,18 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { Edit3 } from "lucide-react";
 import Modal from "./Modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 type AstroDetailItem = { label: string; value: string };
 interface AstroDetailsSectionProps {
-  astroDetails?: AstroDetailItem[]; // optional initial prop
+  astroDetails?: AstroDetailItem[];
 }
 
 const API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/self";
 const UPDATE_API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
 
-/** small local token helper to avoid external dependency */
+/** small local token helper */
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("authToken");
@@ -26,6 +25,28 @@ const defaultItems = (): AstroDetailItem[] => [
   { label: "City of Birth", value: "" },
   { label: "Manglik", value: "" },
 ];
+
+// ===============================================
+// CUSTOM EDIT ICON (same as your screenshot)
+// ===============================================
+const EditIconRounded = (props: any) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6B7280"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="cursor-pointer hover:stroke-gray-700 transition"
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+    <path d="M12 8L8 12L7 16L11 15L15 11" />
+    <path d="M14 6L18 10" />
+  </svg>
+);
 
 const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails }) => {
   const [info, setInfo] = useState<AstroDetailItem[]>(astroDetails ?? defaultItems());
@@ -40,6 +61,7 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
 
   useEffect(() => {
     mountedRef.current = true;
+
     const fetchProfile = async () => {
       setLoading(true);
       setError(null);
@@ -89,7 +111,6 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
   const handleInputChange = (index: number, value: string) => {
     setEditValues((prev) => {
       const next = prev.map((it, i) => (i === index ? { ...it, value } : it));
-      // schedule debounce autosave
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => autoSaveAstro(next), 900);
       return next;
@@ -120,20 +141,12 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        // don't spam user with autosave errors, log instead
-        const text = await res.text().catch(() => "Auto-save failed");
-        console.warn("Auto-save failed:", text);
-        return;
-      }
+      if (!res.ok) return;
 
-      // optimistic update of displayed info
       setInfo(values);
       setUpdateStatus("Changes auto-saved");
       setTimeout(() => setUpdateStatus(null), 1400);
-    } catch (err: any) {
-      console.error("Auto-save error:", err?.message ?? err);
-    }
+    } catch {}
   };
 
   const handleSave = async () => {
@@ -164,12 +177,8 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "Save failed");
-        throw new Error(txt || "Save failed");
-      }
+      if (!res.ok) throw new Error("Save failed");
 
-      // success
       setInfo(editValues);
       setModalOpen(false);
       setUpdateStatus("Astro details saved successfully!");
@@ -192,14 +201,25 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
   return (
     <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm">
       {updateStatus && (
-        <div className={`mb-4 p-2 rounded ${updateStatus.toLowerCase().includes("saved") ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+        <div
+          className={`mb-4 p-2 rounded ${
+            updateStatus.toLowerCase().includes("saved")
+              ? "bg-green-100 text-green-700"
+              : "bg-yellow-100 text-yellow-700"
+          }`}
+        >
           {updateStatus}
         </div>
       )}
 
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Astro Details</h3>
-        <Edit3 className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" onClick={openEditor} />
+
+        {/* UPDATED: Custom Edit Icon */}
+        <div onClick={openEditor}>
+          <EditIconRounded />
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -228,7 +248,9 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
           <div className="mb-4 w-full space-y-3">
             {editValues.map((item, i) => (
               <div key={i}>
-                <Label className="text-sm font-Inter text-gray-700 mb-1 block">{item.label}</Label>
+                <Label className="text-sm font-Inter text-gray-700 mb-1 block">
+                  {item.label}
+                </Label>
                 <input
                   className="w-full rounded-md border border-gray-300 p-2 font-Inter bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-700"
                   value={item.value ?? ""}

@@ -520,8 +520,8 @@ export default function MatrimonialApp() {
 return (
   <div className="min-h-screen bg-gray-50">
 
-    {/* 🔥 EXACT POSITION STICKY NAVBAR (Wahi jagah par fix hota hai) */}
-    <div className="bg-white border-b sticky top-[60px] z-50">
+    {/* 🔥 FIXED TABS NAVBAR — EXACT MAIN NAVBAR KE NICHE */}
+    <div className="bg-white border-b sticky top-[72px] z-40">
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex gap-10 overflow-x-auto items-center justify-evenly">
           {tabs.map((tab) => (
@@ -542,12 +542,12 @@ return (
       </div>
     </div>
 
-    {/* 👇 Your Accepted message section */}
+    <div className="h-2"></div>
+
     {activeTab === "Accepted" && (
       <div className="flex gap-3 items-center justify-center mt-8"></div>
     )}
 
-    {/* 👇 YOUR PAGE CONTENT */}
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
       {loading ? (
         <Loading message="Loading profiles..." />

@@ -1,6 +1,5 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Edit3 } from 'lucide-react';
 import Modal from './Modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,6 +13,28 @@ interface ReligiousInfoSectionProps {
 const API_URL = 'https://matrimonial-backend-7ahc.onrender.com/api/profile/self';
 const UPDATE_API_URL = 'https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile';
 
+// ===============================================
+// CUSTOM EDIT ICON (same as screenshot + all sections)
+// ===============================================
+const EditIconRounded = (props: any) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6B7280"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="cursor-pointer hover:stroke-gray-700 transition"
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+    <path d="M12 8L8 12L7 16L11 15L15 11" />
+    <path d="M14 6L18 10" />
+  </svg>
+);
+
 const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousInfo }) => {
   const [info, setInfo] = useState<ReligiousInfoItem[]>(religiousInfo);
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,7 +45,7 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
 
   // ------------------------------------
-  // Fetch religious data on component load
+  // Fetch religious profile details
   // ------------------------------------
   useEffect(() => {
     const fetchProfile = async () => {
@@ -44,7 +65,6 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
         if (!response.ok) throw new Error('Failed to fetch profile');
 
         const data = await response.json();
-
         const religious = data?.data?.religionDetails || {};
 
         const mapped: ReligiousInfoItem[] = [
@@ -79,7 +99,7 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
   };
 
   // ------------------------------------
-  // Save Updated Data (Instant UI Update)
+  // SAVE Updated Data
   // ------------------------------------
   const handleSave = async () => {
     setUpdateStatus(null);
@@ -109,7 +129,6 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
 
       if (!res.ok) throw new Error('Failed to update religious info');
 
-      // Update UI immediately
       setInfo(editValues);
       setModalOpen(false);
       setUpdateStatus('Religious info updated successfully!');
@@ -119,12 +138,14 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
   };
 
   // ------------------------------------
-  // UI RENDERING
+  // UI Rendering
   // ------------------------------------
 
-  if (loading) return <div className="bg-[#FFF8F0] p-6 shadow-sm text-gray-600">Loading...</div>;
+  if (loading)
+    return <div className="bg-[#FFF8F0] p-6 shadow-sm text-gray-600">Loading...</div>;
 
-  if (error) return <div className="bg-[#FFF8F0] p-6 shadow-sm text-red-500">{error}</div>;
+  if (error)
+    return <div className="bg-[#FFF8F0] p-6 shadow-sm text-red-500">{error}</div>;
 
   return (
     <div className="bg-[#FFF8F0] p-6 shadow-sm">
@@ -140,13 +161,17 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
         </div>
       )}
 
-      {/* Header + Edit Button */}
+      {/* Header + Custom Edit Icon */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Religious Background</h3>
-        <Edit3 className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" onClick={handleEdit} />
+
+        {/* 🔥 UPDATED ICON HERE */}
+        <div onClick={handleEdit}>
+          <EditIconRounded />
+        </div>
       </div>
 
-      {/* Display Data */}
+      {/* Data Display */}
       <div className="grid grid-cols-2 divide-x divide-dashed divide-gray-300">
         <div className="space-y-3 pr-6">
           {info.slice(0, 3).map((item, i) => (
@@ -167,7 +192,7 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
         </div>
       </div>
 
-      {/* Edit Modal */}
+      {/* Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
         <div className="flex flex-col items-center gap-3 mb-4">
           <h2 className="text-xl font-Lato text-gray-900">Edit Religious Info</h2>

@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Edit3 } from "lucide-react";
 import Modal from "./Modal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,11 +14,33 @@ interface BasicInfoSectionProps {
 const API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/self";
 const UPDATE_API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
 
-// small helper
+// helper
 function getToken() {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("authToken");
 }
+
+// ===============================================
+// CUSTOM EDIT ICON (same as your screenshot)
+// ===============================================
+const EditIconRounded = (props: any) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#6B7280"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="cursor-pointer hover:stroke-gray-700 transition"
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+    <path d="M12 8L8 12L7 16L11 15L15 11" />
+    <path d="M14 6L18 10" />
+  </svg>
+);
 
 const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
   basicInfo = [],
@@ -189,16 +210,17 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
         </div>
       )}
 
-      {/* header */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-lg font-semibold text-gray-900">Basic Info</h3>
-        <Edit3
-          onClick={openEditor}
-          className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600"
-        />
+
+        {/* UPDATED CUSTOM ICON */}
+        <div onClick={openEditor}>
+          <EditIconRounded />
+        </div>
       </div>
 
-      {/* two-column display */}
+      {/* Two-column data */}
       <div className="grid grid-cols-2 divide-x divide-dashed divide-gray-300">
         <div className="space-y-3 pr-6">
           {info.slice(0, Math.ceil(info.length / 2)).map((item, idx) => (
@@ -223,7 +245,7 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
         </div>
       </div>
 
-      {/* modal */}
+      {/* Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
         <div className="mb-4 text-center">
           <h2 className="text-xl font-Lato text-gray-900">Edit Basic Info</h2>

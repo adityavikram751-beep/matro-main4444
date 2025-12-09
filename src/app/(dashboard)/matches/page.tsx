@@ -94,7 +94,7 @@ export default function MatrimonialApp() {
     <div className="min-h-screen bg-gray-50">
 
       {/* ⭐ SECOND TOP BAR (TABS) FIXED BELOW MAIN NAV */}
-      <div className="fixed top-[60px] left-0 w-full z-40 bg-white border-b shadow-sm">
+      <div className="fixed top-[70px] left-0 w-full z-40 bg-white border-b shadow-sm">
         <NavigationTabs
           activeTab={activeTab}
           setActiveTab={setActiveTab}
