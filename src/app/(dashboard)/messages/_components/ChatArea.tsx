@@ -54,6 +54,7 @@ export default function ChatArea({
   onOpenSidebar,
   onMessageSent,
 }: ChatAreaProps) {
+  // Main state
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [replyingMessage, setReplyingMessage] = useState<Message | null>(null);
@@ -62,6 +63,12 @@ export default function ChatArea({
   const [conversationOnline, setConversationOnline] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+
+  // REPORT states
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportImages, setReportImages] = useState<File[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -78,126 +85,108 @@ export default function ChatArea({
 
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
 
-  // ✅ FIXED: Combined socket listeners into ONE useEffect with proper cleanup
+  // -------------------------
+  // Socket listeners (combined)
+  // -------------------------
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
-    // Named handler functions for proper cleanup
+    // -- handle sent message (ack from server)
     const handleSentMessage = (msg: SocketMessage) => {
-      console.log("🟢 msg-sent EVENT:", {
-        msgId: msg._id,
-        tempId: msg.tempId,
-        from: msg.senderId,
-        to: msg.receiverId,
-        text: msg.messageText?.substring(0, 20)
-      });
-      
-      // ✅ Only process if this message belongs to current conversation
+      // console.log("🟢 msg-sent EVENT:", { msgId: msg._id, tempId: msg.tempId, from: msg.senderId, to: msg.receiverId });
+
+      // Only process messages for this conversation
       if (msg.receiverId !== conversation.id) return;
-      
-      setMessages(prev => {
-        console.log("🔍 Checking messages, total:", prev.length);
-        
-        // ✅ FIX: If tempId exists, try to replace temp message
+
+      setMessages((prev) => {
+        // Replace temp message if tempId exists
         if (msg.tempId) {
-          const tempIndex = prev.findIndex(m => m.id === msg.tempId);
+          const tempIndex = prev.findIndex((m) => m.id === msg.tempId);
           if (tempIndex !== -1) {
-            console.log("✅ Found temp message at index:", tempIndex);
             const updated = [...prev];
             updated[tempIndex] = mapSocketToMessage(msg, currentUser, conversation);
             return updated;
           }
         }
-        
-        // ✅ CRITICAL FIX: Check if message already exists by _id
-        const existingIndex = prev.findIndex(m => m.id === msg._id);
+
+        // Avoid duplicates by _id
+        const existingIndex = prev.findIndex((m) => m.id === msg._id);
         if (existingIndex !== -1) {
-          console.log("⚠️ Message already exists at index:", existingIndex, "- Updating it");
           const updated = [...prev];
           updated[existingIndex] = mapSocketToMessage(msg, currentUser, conversation);
           return updated;
         }
-        
-        // ✅ NEW FIX: If no tempId, check if last message is from same sender with similar timestamp
-        // This handles the case where backend doesn't return tempId
+
+        // Try to detect optimistic match by comparing last message text & timestamp
         const lastMsg = prev[prev.length - 1];
-        const timeDiff = lastMsg ? new Date(msg.createdAt || msg.timestamp).getTime() - new Date(lastMsg.timestamp).getTime() : Infinity;
-        
-        if (lastMsg && 
-            lastMsg.senderId === msg.senderId && 
-            lastMsg.text === msg.messageText &&
-            Math.abs(timeDiff) < 2000) { // Within 2 seconds
-          console.log("✅ Found matching optimistic message (by content & time)");
+        const timeDiff = lastMsg
+          ? new Date(msg.createdAt || msg.timestamp).getTime() - new Date(lastMsg.timestamp).getTime()
+          : Infinity;
+
+        if (
+          lastMsg &&
+          lastMsg.senderId === msg.senderId &&
+          lastMsg.text === msg.messageText &&
+          Math.abs(timeDiff) < 2000
+        ) {
           const updated = [...prev];
           updated[prev.length - 1] = mapSocketToMessage(msg, currentUser, conversation);
           return updated;
         }
-        
-        console.log("➕ Adding new message");
-        // Add new message
+
+        // Else append
         return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
       });
     };
 
+    // -- handle incoming messages (others)
     const handleIncomingMessage = (msg: SocketMessage) => {
-      console.log("🔵 msg-receive EVENT:", {
-        msgId: msg._id,
-        from: msg.senderId,
-        to: msg.receiverId,
-        currentUser: currentUser._id,
-        text: msg.messageText?.substring(0, 20)
-      });
-      
-      // ✅ FIX: Ignore messages sent by current user (already handled by msg-sent)
+      // console.log("🔵 msg-receive EVENT:", { msgId: msg._id, from: msg.senderId });
+
+      // Ignore if this is my own message (server might emit)
       if (msg.senderId === currentUser._id) {
-        console.log("❌ IGNORING: This is my own message (handled by msg-sent)");
         return;
       }
-      
-      // Only accept messages FROM the other person TO me
+
+      // Validate it's from the conversation partner to me
       const isRelevant = msg.senderId === conversation.id && msg.receiverId === currentUser._id;
-
       if (!isRelevant) {
-        console.log("❌ IGNORING: Not relevant to this conversation");
         return;
       }
 
-      setMessages(prev => {
-        // Check for duplicates by message ID
-        if (prev.some(m => m.id === msg._id)) {
-          console.log("⚠️ DUPLICATE in msg-receive! Already exists:", msg._id);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg._id)) {
           return prev;
         }
-        console.log("✅ Adding incoming message from other user");
         return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
       });
 
       setShouldAutoScroll(true);
     };
 
+    // -- block/unblock events
     const handleUserBlocked = (data: any) => {
       if (data.blockedBy === conversation.id) {
-        setBlockStatus(prev => ({ ...prev, blockedMe: true }));
+        setBlockStatus((prev) => ({ ...prev, blockedMe: true }));
         alert("This user has blocked you.");
       }
     };
 
     const handleUserUnblocked = (data: any) => {
       if (data.unblockedBy === conversation.id) {
-        setBlockStatus(prev => ({ ...prev, blockedMe: false }));
+        setBlockStatus((prev) => ({ ...prev, blockedMe: false }));
         alert("You are unblocked by this user.");
       }
     };
 
+    // -- online/offline
     const handleUserOnline = (userId: string) => {
       if (userId === conversation.id) setConversationOnline(true);
     };
-
     const handleUserOffline = (userId: string) => {
       if (userId === conversation.id) setConversationOnline(false);
     };
 
-    // Register all listeners
     socket.on("msg-sent", handleSentMessage);
     socket.on("msg-receive", handleIncomingMessage);
     socket.on("user-blocked", handleUserBlocked);
@@ -205,7 +194,6 @@ export default function ChatArea({
     socket.on("user-online", handleUserOnline);
     socket.on("user-offline", handleUserOffline);
 
-    // ✅ CRITICAL: Clean up ALL listeners when component unmounts or dependencies change
     return () => {
       socket.off("msg-sent", handleSentMessage);
       socket.off("msg-receive", handleIncomingMessage);
@@ -214,8 +202,9 @@ export default function ChatArea({
       socket.off("user-online", handleUserOnline);
       socket.off("user-offline", handleUserOffline);
     };
-  }, [socket, currentUser, conversation]); // Only re-run when these change
+  }, [socket, currentUser, conversation]);
 
+  // close active message menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest(".message-bubble")) {
@@ -226,10 +215,12 @@ export default function ChatArea({
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
+  // autoscroll when messages change
   useEffect(() => {
     if (shouldAutoScroll) scrollToBottom();
   }, [messages, shouldAutoScroll]);
 
+  // when switching conversation quickly scroll instantly
   useEffect(() => {
     if (conversation) {
       setShouldAutoScroll(true);
@@ -237,7 +228,7 @@ export default function ChatArea({
     }
   }, [conversation.id]);
 
-  // Fetch messages
+  // Fetch messages for conversation
   useEffect(() => {
     if (!currentUser || !conversation) return;
 
@@ -259,7 +250,7 @@ export default function ChatArea({
         setIsLoading(false);
         setShouldAutoScroll(true);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to fetch messages:", err);
         setIsLoading(false);
       }
     };
@@ -291,7 +282,7 @@ export default function ChatArea({
     fetchBlockStatus();
   }, [conversation]);
 
-  // Fetch online status
+  // Fetch online list to check if conversation partner is online
   useEffect(() => {
     const fetchOnlineStatus = async () => {
       if (!conversation.id) return;
@@ -305,80 +296,86 @@ export default function ChatArea({
         const onlineUsers: string[] = data.data || [];
         setConversationOnline(onlineUsers.includes(conversation.id));
       } catch (err) {
-        console.error(err);
+        console.error("Failed to fetch online status:", err);
         setConversationOnline(false);
       }
     };
     fetchOnlineStatus();
   }, [conversation.id]);
 
+  // -------------------------
+  // Send message (optimistic UI)
+  // -------------------------
+  const onSendMessage = async (text: string, files?: File[]) => {
+    if (!currentUser || !conversation.id) return;
+    if (!text.trim() && (!files || files.length === 0)) return;
 
+    const token = localStorage.getItem("authToken");
 
-const onSendMessage = async (text: string, files?: File[]) => {
-  if (!currentUser || !conversation.id) return;
-  if (!text.trim() && (!files || files.length === 0)) return;
+    const tempId = "temp-" + Date.now();
+    const localFiles = files?.length
+      ? files.map((file) => ({
+          fileName: file.name,
+          fileUrl: URL.createObjectURL(file),
+          fileType: file.type,
+          fileSize: file.size,
+        }))
+      : [];
 
-  const token = localStorage.getItem("authToken");
+    // optimistic message
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        senderId: currentUser._id,
+        receiverId: conversation.id,
+        text,
+        timestamp: new Date().toISOString(),
+        sender: "me",
+        avatar: currentUser.profileImage,
+        files: localFiles,
+      },
+    ]);
 
-  // ⭐ Optimistic UI message
-  const tempId = "temp-" + Date.now();
-  const localFiles = files?.length
-    ? files.map((file) => ({
-        fileName: file.name,
-        fileUrl: URL.createObjectURL(file),
-        fileType: file.type,
-        fileSize: file.size,
-      }))
-    : [];
+    scrollToBottom();
 
-  setMessages((prev) => [
-    ...prev,
-    {
-      id: tempId,
-      senderId: currentUser._id,
-      receiverId: conversation.id,
-      text,
-      timestamp: new Date().toISOString(),
-      sender: "me",
-      avatar: currentUser.profileImage,
-      files: localFiles,
-    },
-  ]);
-
-  scrollToBottom();
-
-  // ⭐ Socket emit (temp message mapping)
-  socket.emit("send-msg", {
-    tempId,
-    from: currentUser._id,
-    to: conversation.id,
-    messageText: text,
+    // emit socket with tempId
+    socket.emit("send-msg", {
+      tempId,
+      from: currentUser._id,
+      to: conversation.id,
+      messageText: text,
       replyToId: replyingMessage?.id || null,
-
-  });
-
-  // ⭐ Backend ko final message + files bhejo
-  const formData = new FormData();
-  formData.append("receiverId", conversation.id);
-  formData.append("messageText", text);
-formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
-
-  if (files) {
-    files.forEach((file) => {
-      formData.append("files", file);
     });
-  }
 
-  await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-    setReplyingMessage(null); 
+    // send to backend
+    const formData = new FormData();
+    formData.append("receiverId", conversation.id);
+    formData.append("messageText", text);
+    formData.append("replyToId", replyingMessage?.id || "");
 
-};
+    if (files) {
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+    }
 
+    try {
+      await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+    } catch (err) {
+      console.error("Failed to send message to backend:", err);
+    } finally {
+      setReplyingMessage(null);
+    }
+  };
 
+  // -------------------------
+  // Block / Unblock / Delete chat
+  // -------------------------
   const handleBlockUser = async () => {
     if (!conversation.id) return;
     try {
@@ -393,7 +390,6 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
           },
           body: JSON.stringify({ otherUserId: conversation.id }),
         }
-        
       );
       if (!res.ok) throw new Error("Failed to block user");
       setBlockStatus({ ...blockStatus, iBlocked: true });
@@ -462,6 +458,7 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
     }
   };
 
+  // delete single message
   const handleDelete = async (msgId: string) => {
     if (msgId.startsWith("temp-"))
       return setMessages((prev) => prev.filter((m) => m.id !== msgId));
@@ -488,11 +485,64 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
     }
   };
 
+  // reply action
   const handleReply = (msg: Message) => {
     setReplyingMessage(msg);
     setActiveMessageId(null);
   };
 
+  // -------------------------
+  // Report feature
+  // -------------------------
+  const handleSubmitReport = async () => {
+    if (!reportTitle.trim() || !reportDescription.trim()) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const formData = new FormData();
+
+      // ⭐ BACKEND REQUIRES "reportedUser" NOT "reportedUserId"
+      formData.append("reportedUser", conversation.id);
+      formData.append("title", reportTitle);
+      formData.append("description", reportDescription);
+
+      reportImages.forEach((img) => {
+        formData.append("image", img);
+      });
+
+      const res = await fetch(
+        "https://matrimonial-backend-7ahc.onrender.com/api/report/create",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        }
+      );
+
+      const data = await res.json();
+      console.log("Report Response → ", data);
+
+      if (data.success) {
+        alert("Report submitted successfully.");
+        setIsReportOpen(false);
+        setReportTitle("");
+        setReportDescription("");
+        setReportImages([]);
+      } else {
+        alert(data.message || "Failed to submit report");
+      }
+    } catch (err) {
+      console.error("Report error:", err);
+      alert("Failed to submit report");
+    }
+  };
+
+  // -------------------------
+  // Utilities
+  // -------------------------
   const formatTime = (timestamp: string) =>
     new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -512,6 +562,9 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
     }
   };
 
+  // -------------------------
+  // Render
+  // -------------------------
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -520,7 +573,13 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
         <div className="flex items-center space-x-3">
           <div className="relative">
             {conversation.avatar ? (
-              <Image src={conversation.avatar} alt={conversation.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
+              <Image
+                src={conversation.avatar}
+                alt={conversation.name}
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full object-cover"
+              />
             ) : (
               <div className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center">
                 {conversation.name?.charAt(0).toUpperCase()}
@@ -547,11 +606,42 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
           </button>
 
           {headerMenuOpen && (
-            <div className="absolute right-0 mt-2 w-40 bg-white shadow-md rounded-md border z-50">
-              <button onClick={handleBlockUser} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">
-                Block User
+            <div className="
+              absolute right-0 mt-2 w-44 
+              bg-white shadow-xl rounded-xl border 
+              z-50 overflow-hidden
+            ">
+              {/* REPORT */}
+              <button
+                onClick={() => {
+                  setIsReportOpen(true);
+                  setHeaderMenuOpen(false);
+                }}
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
+              >
+                Report User
               </button>
-              <button onClick={handleDeleteAllChat} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-500">
+
+              {!blockStatus.iBlocked ? (
+                <button
+                  onClick={handleBlockUser}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                >
+                  Block User
+                </button>
+              ) : (
+                <button
+                  onClick={handleUnblockUser}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-yellow-700"
+                >
+                  Unblock
+                </button>
+              )}
+
+              <button
+                onClick={handleDeleteAllChat}
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-500"
+              >
                 Delete Chat
               </button>
             </div>
@@ -559,8 +649,75 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
         </div>
       </div>
 
-     
-      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scroll-smooth">
+      {/* Report Popup */}
+      {isReportOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white w-[92%] sm:w-96 rounded-lg shadow-lg p-5 space-y-4">
+            <h2 className="text-lg font-bold">Report User</h2>
+
+            <input
+              className="w-full border p-2 rounded"
+              placeholder="Enter report title (e.g. Spam)"
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value)}
+            />
+
+            <textarea
+              className="w-full border p-2 rounded h-24"
+              placeholder="Describe the issue…"
+              value={reportDescription}
+              onChange={(e) => setReportDescription(e.target.value)}
+            />
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Upload Proof Images</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setReportImages(Array.from(e.target.files || []))}
+              />
+
+              {reportImages.length > 0 && (
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {reportImages.map((img, i) => (
+                    <div key={i} className="relative w-16 h-16 rounded overflow-hidden border">
+                      <img
+                        src={URL.createObjectURL(img)}
+                        className="w-full h-full object-cover"
+                        alt={`preview-${i}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between pt-2">
+              <button
+                onClick={() => setIsReportOpen(false)}
+                className="px-4 py-2 rounded bg-gray-200"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleSubmitReport}
+                className="px-4 py-2 rounded bg-red-500 text-white"
+              >
+                Submit Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scroll-smooth"
+      >
         {isLoading ? (
           <p className="text-center text-gray-500">Loading messages...</p>
         ) : messages.length === 0 ? (
@@ -569,22 +726,35 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
           messages.map((msg) => {
             const isMe = msg.sender === "me";
             return (
-              <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"} message-bubble`} onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}>
-                <div className={`max-w-xs lg:max-w-md p-3 rounded-2xl 
-                  ${isMe ? "bg-indigo-500 text-white" : "bg-white shadow-sm border"} 
-                  ${replyingMessage?.id === msg.id ? "ring-2 ring-indigo-400" : ""} relative`}>
+              <div
+                key={msg.id}
+                className={`flex ${isMe ? "justify-end" : "justify-start"} message-bubble`}
+                onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}
+              >
+                <div
+                  className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${
+                    isMe ? "bg-indigo-500 text-white" : "bg-white shadow-sm border"
+                  } ${replyingMessage?.id === msg.id ? "ring-2 ring-indigo-400" : ""} relative`}
+                >
                   {msg.replyTo && (
-                    <div className="bg-gray-200 p-2 rounded mb-1 border-l-2 border-indigo-500 text-xs text-gray-700 truncate">
+                    <div className="bg-indigo-100 text-indigo-800 p-2 rounded mb-1 border-l-4 border-indigo-500 text-xs font-medium truncate">
                       {msg.replyTo.text || "File/Media"}
                     </div>
                   )}
+
                   {msg.text && <p className="text-sm mb-1">{msg.text}</p>}
+
                   {msg.files && msg.files.length > 0 && (
                     <div className="space-y-2 mt-2">
                       {msg.files.map((file, i) => (
                         <div key={i} className="border rounded-lg overflow-hidden relative">
                           {isImage(file.fileType) ? (
-                            <img src={file.fileUrl} alt={file.fileName} className="w-full h-auto max-h-40 object-cover cursor-pointer" onClick={() => window.open(file.fileUrl, "_blank")} />
+                            <img
+                              src={file.fileUrl}
+                              alt={file.fileName}
+                              className="w-full h-auto max-h-40 object-cover cursor-pointer"
+                              onClick={() => window.open(file.fileUrl, "_blank")}
+                            />
                           ) : (
                             <div className="flex items-center gap-3 p-2 bg-gray-50">
                               <FileText size={20} className="text-gray-600" />
@@ -602,16 +772,18 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
                       ))}
                     </div>
                   )}
+
                   <p className="text-xs mt-1 text-gray-300">{formatTime(msg.timestamp)}</p>
 
                   {activeMessageId === msg.id && (
-                    <div className="absolute top-0 right-0 bg-white border shadow-lg rounded-md text-sm z-50 flex flex-col">
+                    <div className="absolute top-0 right-0 bg-white border shadow-lg rounded-md text-sm z-50 flex flex-col overflow-hidden">
                       <button
-                        className="px-3 py-1 hover:bg-gray-100"
+                        className="px-3 py-1 hover:bg-gray-100 text-black"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleReply(msg);
-                        }}>
+                        }}
+                      >
                         Reply
                       </button>
                       {isMe && (
@@ -620,7 +792,8 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDelete(msg.id);
-                          }}>
+                          }}
+                        >
                           Delete
                         </button>
                       )}
@@ -646,24 +819,25 @@ formData.append("replyToId", replyingMessage?.id || "");   // 👈 ADD THIS
           <button onClick={handleUnblockUser} className="text-yellow-700 underline font-semibold">Unblock</button>
         </div>
       )}
-{/* Instagram Style Reply Preview (Bottom Just Above Input) */}
-{replyingMessage && (
-  <div className="px-4 py-2 bg-white border-t border-gray-300 flex items-center justify-between shadow-sm">
-    <div className="flex flex-col max-w-[85%]">
-      <span className="text-[11px] text-gray-500">Replying to</span>
-      <span className="text-sm font-semibold text-gray-800 truncate">
-        {replyingMessage.text || "File / Media"}
-      </span>
-    </div>
 
-    <button
-      onClick={() => setReplyingMessage(null)}
-      className="text-gray-500 hover:text-red-500"
-    >
-      ✕
-    </button>
-  </div>
-)}
+      {/* Instagram Style Reply Preview (Bottom Just Above Input) */}
+      {replyingMessage && (
+        <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-200 flex items-center justify-between shadow-sm">
+          <div className="flex flex-col max-w-[85%]">
+            <span className="text-[11px] text-indigo-700">Replying to</span>
+            <span className="text-sm font-semibold text-indigo-900 truncate">
+              {replyingMessage.text || "File / Media"}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setReplyingMessage(null)}
+            className="text-indigo-500 hover:text-red-500 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Input Box */}
       <MessageInput

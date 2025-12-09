@@ -22,7 +22,7 @@ export default function SuccessStories() {
       id: 3,
       img: "/Images/Rectangle 34624459.png",
       quote: "A platform that truly understands the importance of marriage. We couldn't be happier with our journey together.",
-      names: "- Vikram & Kavya",
+      names: "- Aditya & Kavya",
       year: "2023"
     }
   ];
