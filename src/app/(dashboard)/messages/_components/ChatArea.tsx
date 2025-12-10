@@ -96,7 +96,15 @@ export default function ChatArea({
       // console.log("🟢 msg-sent EVENT:", { msgId: msg._id, tempId: msg.tempId, from: msg.senderId, to: msg.receiverId });
 
       // Only process messages for this conversation
-      if (msg.receiverId !== conversation.id) return;
+// message belongs to this conversation?
+if (
+  !(
+    (msg.senderId === currentUser._id && msg.receiverId === conversation.id) ||
+    (msg.senderId === conversation.id && msg.receiverId === currentUser._id)
+  )
+) {
+  return;
+}
 
       setMessages((prev) => {
         // Replace temp message if tempId exists
@@ -360,17 +368,17 @@ export default function ChatArea({
       });
     }
 
-    try {
-      await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-    } catch (err) {
-      console.error("Failed to send message to backend:", err);
-    } finally {
-      setReplyingMessage(null);
-    }
+    // try {
+    //   await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
+    //     method: "POST",
+    //     headers: { Authorization: `Bearer ${token}` },
+    //     body: formData,
+    //   });
+    // } catch (err) {
+    //   console.error("Failed to send message to backend:", err);
+    // } finally {
+    //   setReplyingMessage(null);
+    // }
   };
 
   // -------------------------
