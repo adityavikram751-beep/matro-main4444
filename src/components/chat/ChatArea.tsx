@@ -6,6 +6,7 @@ import MessageInput from './MessageInput';
 import MessageBubble from './MessageBubble';
 import Image from 'next/image';
 
+
 interface ChatAreaProps {
   conversation: Conversation;
   messages: Message[];
