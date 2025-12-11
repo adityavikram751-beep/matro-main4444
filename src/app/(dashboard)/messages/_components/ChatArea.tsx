@@ -343,19 +343,19 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
 
     files?.forEach((file) => formData.append("files", file));
 
-    // try {
-    //   await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
-    //     method: "POST",
-    //     headers: { Authorization: `Bearer ${token}` },
-    //     body: formData,
-    //   });
-    // } catch (err) {
-    //   console.error("Failed to send message to backend:", err);
-    //   // optional: mark as failed in UI (e.g., set a `failed` flag in message) - left out for brevity
-    // } finally {
-    //   setReplyingMessage(null);
-    //   onMessageSent?.(conversation.id, text);
-    // }
+    try {
+      await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+    } catch (err) {
+      console.error("Failed to send message to backend:", err);
+      // optional: mark as failed in UI (e.g., set a `failed` flag in message) - left out for brevity
+    } finally {
+      setReplyingMessage(null);
+      onMessageSent?.(conversation.id, text);
+    }
   };
 
   // -------------------------
