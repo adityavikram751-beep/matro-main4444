@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Socket } from "socket.io-client";
 import Image from "next/image";
 import MessageInput from "./MessageInput";
 import { Eye, Download, FileText, MoreVertical } from "lucide-react";
 import { Conversation, Message, MessageFile, SocketMessage } from "@/types/chat";
-import { Socket } from "socket.io-client";
 
 interface User {
   _id: string;
-  firstName?: string;
-  lastName?: string;
+  firstName: string;
+  lastName: string;
   profileImage?: string;
 }
 
@@ -18,28 +18,43 @@ interface ChatAreaProps {
   conversation: Conversation;
   currentUser: User | null;
   socket: Socket;
-  onOpenSidebar?: () => void;
-  onMessageSent?: (conversationId: string, text: string) => void;
+  onOpenSidebar: () => void;
+  onMessageSent: (conversationId: string, text: string) => void;
+  messages: Message[];
+  setMessages: (msgs: Message[]) => void;
 }
 
-function mapSocketToMessage(msg: SocketMessage, currentUser: User, conversation: Conversation): Message {
+function mapSocketToMessage(
+  msg: SocketMessage,
+  currentUser: User,
+  conversation: Conversation
+): Message {
   return {
-    id: msg._id || msg.tempId || `msg-${Date.now()}`,
+    id: msg._id || msg.tempId || `msg-${msg.senderId}-${msg.receiverId}-${Date.now()}`,
     senderId: msg.senderId,
     receiverId: msg.receiverId,
-    text: msg.messageText || "",
+    text: msg.messageText,
     timestamp: msg.createdAt || new Date().toISOString(),
-    sender: String(msg.senderId) === String(currentUser._id) ? "me" : "other",
+    sender: msg.senderId === currentUser._id ? "me" : "other",
     avatar:
-      String(msg.senderId) === String(currentUser._id)
-        ? currentUser?.profileImage
+      msg.senderId === currentUser._id
+        ? currentUser.profileImage || "/my-avatar.png"
         : conversation.avatar,
-    files: msg.files || [],
-    replyTo: msg.replyTo ? mapSocketToMessage(msg.replyTo, currentUser, conversation) : undefined,
+    files: msg.files,
+    replyTo: msg.replyTo
+      ? mapSocketToMessage(msg.replyTo, currentUser, conversation)
+      : undefined,
   };
 }
 
-export default function ChatArea({ conversation, currentUser, socket, onOpenSidebar, onMessageSent }: ChatAreaProps) {
+export default function ChatArea({
+  conversation,
+  currentUser,
+  socket,
+  onOpenSidebar,
+  onMessageSent,
+}: ChatAreaProps) {
+  // Main state
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [replyingMessage, setReplyingMessage] = useState<Message | null>(null);
@@ -48,6 +63,12 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
   const [conversationOnline, setConversationOnline] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+
+  // REPORT states
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportImages, setReportImages] = useState<File[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -64,118 +85,126 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
 
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
 
-  // ---------------------------
-  // FIXED SOCKET LISTENERS
-  // ---------------------------
+  // -------------------------
+  // Socket listeners (combined)
+  // -------------------------
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
-    // -------------------------
-    // 1. FIXED msg-sent (replace temp message)
-    // -------------------------
+    // -- handle sent message (ack from server)
     const handleSentMessage = (msg: SocketMessage) => {
-      if (String(msg.senderId) !== String(currentUser._id)) return;
-      if (String(msg.receiverId) !== String(conversation.id)) return;
+      // console.log("🟢 msg-sent EVENT:", { msgId: msg._id, tempId: msg.tempId, from: msg.senderId, to: msg.receiverId });
+
+      // Only process messages for this conversation
+      if (msg.receiverId !== conversation.id) return;
 
       setMessages((prev) => {
-        const mapped = mapSocketToMessage(msg, currentUser!, conversation);
-
-        // Replace optimistic temp message
+        // Replace temp message if tempId exists
         if (msg.tempId) {
-          return prev.map((m) => (m.id === msg.tempId ? mapped : m));
+          const tempIndex = prev.findIndex((m) => m.id === msg.tempId);
+          if (tempIndex !== -1) {
+            const updated = [...prev];
+            updated[tempIndex] = mapSocketToMessage(msg, currentUser, conversation);
+            return updated;
+          }
         }
 
-        // Avoid duplicate
-        if (prev.some((m) => m.id === msg._id)) return prev;
+        // Avoid duplicates by _id
+        const existingIndex = prev.findIndex((m) => m.id === msg._id);
+        if (existingIndex !== -1) {
+          const updated = [...prev];
+          updated[existingIndex] = mapSocketToMessage(msg, currentUser, conversation);
+          return updated;
+        }
 
-        return [...prev, mapped];
+        // Try to detect optimistic match by comparing last message text & timestamp
+        const lastMsg = prev[prev.length - 1];
+        const timeDiff = lastMsg
+          ? new Date(msg.createdAt || msg.timestamp).getTime() - new Date(lastMsg.timestamp).getTime()
+          : Infinity;
+
+        if (
+          lastMsg &&
+          lastMsg.senderId === msg.senderId &&
+          lastMsg.text === msg.messageText &&
+          Math.abs(timeDiff) < 2000
+        ) {
+          const updated = [...prev];
+          updated[prev.length - 1] = mapSocketToMessage(msg, currentUser, conversation);
+          return updated;
+        }
+
+        // Else append
+        return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
       });
     };
 
-    // -------------------------
-    // 2. FIXED msg-receive (sender must NEVER process this)
-    // -------------------------
+    // -- handle incoming messages (others)
     const handleIncomingMessage = (msg: SocketMessage) => {
-      // ❌ IF I AM SENDER → DO NOT PROCESS (fixes duplicate)
-      if (String(msg.senderId) === String(currentUser._id)) return;
+      // console.log("🔵 msg-receive EVENT:", { msgId: msg._id, from: msg.senderId });
 
-      // Accept only if message is for me
-      if (String(msg.receiverId) !== String(currentUser._id)) return;
+      // Ignore if this is my own message (server might emit)
+      if (msg.senderId === currentUser._id) {
+        return;
+      }
 
-      // Accept only if from the currently open chat
-      if (String(msg.senderId) !== String(conversation.id)) return;
+      // Validate it's from the conversation partner to me
+      const isRelevant = msg.senderId === conversation.id && msg.receiverId === currentUser._id;
+      if (!isRelevant) {
+        return;
+      }
 
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg._id)) return prev;
-        return [...prev, mapSocketToMessage(msg, currentUser!, conversation)];
+        if (prev.some((m) => m.id === msg._id)) {
+          return prev;
+        }
+        return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
       });
 
       setShouldAutoScroll(true);
     };
 
-    socket.on("msg-sent", handleSentMessage);
-    socket.on("msg-receive", handleIncomingMessage);
-
-    return () => {
-      socket.off("msg-sent", handleSentMessage);
-      socket.off("msg-receive", handleIncomingMessage);
-    };
-  }, [socket, currentUser, conversation]);
-  // ---------------------------
-  // Remaining socket listeners: block/unblock/online/offline
-  // kept in separate effect so we don't accidentally re-register when fetch runs
-  // ---------------------------
-  useEffect(() => {
-    if (!socket || !conversation || !currentUser) return;
-
+    // -- block/unblock events
     const handleUserBlocked = (data: any) => {
-      try {
-        // data.blockedBy is the user who blocked someone
-        if (String(data.blockedBy) === String(conversation.id)) {
-          // conversation partner blocked current user
-          setBlockStatus((prev) => ({ ...prev, blockedMe: true }));
-        }
-        if (String(data.blockedBy) === String(currentUser._id)) {
-          // I blocked conversation partner
-          setBlockStatus((prev) => ({ ...prev, iBlocked: true }));
-        }
-      } catch (e) {
-        // ignore
+      if (data.blockedBy === conversation.id) {
+        setBlockStatus((prev) => ({ ...prev, blockedMe: true }));
+        alert("This user has blocked you.");
       }
     };
 
     const handleUserUnblocked = (data: any) => {
-      try {
-        if (String(data.unblockedBy) === String(conversation.id)) {
-          setBlockStatus((prev) => ({ ...prev, blockedMe: false }));
-        }
-        if (String(data.unblockedBy) === String(currentUser._id)) {
-          setBlockStatus((prev) => ({ ...prev, iBlocked: false }));
-        }
-      } catch (e) {}
+      if (data.unblockedBy === conversation.id) {
+        setBlockStatus((prev) => ({ ...prev, blockedMe: false }));
+        alert("You are unblocked by this user.");
+      }
     };
 
+    // -- online/offline
     const handleUserOnline = (userId: string) => {
-      if (String(userId) === String(conversation.id)) setConversationOnline(true);
+      if (userId === conversation.id) setConversationOnline(true);
     };
     const handleUserOffline = (userId: string) => {
-      if (String(userId) === String(conversation.id)) setConversationOnline(false);
+      if (userId === conversation.id) setConversationOnline(false);
     };
 
+    socket.on("msg-sent", handleSentMessage);
+    socket.on("msg-receive", handleIncomingMessage);
     socket.on("user-blocked", handleUserBlocked);
     socket.on("user-unblocked", handleUserUnblocked);
     socket.on("user-online", handleUserOnline);
     socket.on("user-offline", handleUserOffline);
 
     return () => {
+      socket.off("msg-sent", handleSentMessage);
+      socket.off("msg-receive", handleIncomingMessage);
       socket.off("user-blocked", handleUserBlocked);
       socket.off("user-unblocked", handleUserUnblocked);
       socket.off("user-online", handleUserOnline);
       socket.off("user-offline", handleUserOffline);
     };
-  }, [socket, conversation, currentUser]);
+  }, [socket, currentUser, conversation]);
 
-  // click outside to close active message actions
+  // close active message menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest(".message-bubble")) {
@@ -195,23 +224,14 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
   useEffect(() => {
     if (conversation) {
       setShouldAutoScroll(true);
-      // instant scroll (some browsers don't support "instant", fallback to "auto")
-      try {
-        scrollToBottom("instant" as ScrollBehavior);
-      } catch {
-        scrollToBottom("auto" as ScrollBehavior);
-      }
+      setTimeout(() => scrollToBottom("instant"), 100);
     }
-    // clear messages/loading for new conversation to avoid showing previous messages while fetching
-    setIsLoading(true);
-    setMessages([]);
   }, [conversation.id]);
 
-  // Fetch messages for conversation (initial load)
+  // Fetch messages for conversation
   useEffect(() => {
     if (!currentUser || !conversation) return;
 
-    let mounted = true;
     const fetchMessages = async () => {
       try {
         const token = localStorage.getItem("authToken");
@@ -220,23 +240,13 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.ok) throw new Error("Failed to fetch messages");
+
         const data = await res.json();
-        if (!mounted) return;
-        const loadedMessages: Message[] = (data.data || []).map((msg: SocketMessage) =>
+        const loadedMessages: Message[] = data.data.map((msg: SocketMessage) =>
           mapSocketToMessage(msg, currentUser, conversation)
         );
 
-        // Deduplicate just in case (server can be chatty)
-        const unique: Message[] = [];
-        const seen = new Set<string>();
-        for (const m of loadedMessages) {
-          if (!seen.has(m.id)) {
-            unique.push(m);
-            seen.add(m.id);
-          }
-        }
-
-        setMessages(unique);
+        setMessages(loadedMessages);
         setIsLoading(false);
         setShouldAutoScroll(true);
       } catch (err) {
@@ -246,9 +256,6 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
     };
 
     fetchMessages();
-    return () => {
-      mounted = false;
-    };
   }, [conversation.id, currentUser]);
 
   // Fetch block status
@@ -267,8 +274,6 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
             iBlocked: data.data.iBlocked,
             blockedMe: data.data.blockedMe,
           });
-        } else {
-          setBlockStatus({ iBlocked: false, blockedMe: false });
         }
       } catch (err) {
         console.error("Failed to fetch block status:", err);
@@ -299,49 +304,61 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
   }, [conversation.id]);
 
   // -------------------------
-  // Send message (optimistic UI + API upload)
-  // Do NOT emit socket here (server will emit after saving).
+  // Send message (optimistic UI)
   // -------------------------
   const onSendMessage = async (text: string, files?: File[]) => {
     if (!currentUser || !conversation.id) return;
     if (!text.trim() && (!files || files.length === 0)) return;
 
     const token = localStorage.getItem("authToken");
+
     const tempId = "temp-" + Date.now();
+    const localFiles = files?.length
+      ? files.map((file) => ({
+          fileName: file.name,
+          fileUrl: URL.createObjectURL(file),
+          fileType: file.type,
+          fileSize: file.size,
+        }))
+      : [];
 
-    const localFiles =
-      files?.length
-        ? files.map((file) => ({
-            fileName: file.name,
-            fileUrl: URL.createObjectURL(file),
-            fileType: file.type,
-            fileSize: file.size,
-          }))
-        : [];
+    // optimistic message
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        senderId: currentUser._id,
+        receiverId: conversation.id,
+        text,
+        timestamp: new Date().toISOString(),
+        sender: "me",
+        avatar: currentUser.profileImage,
+        files: localFiles,
+      },
+    ]);
 
-    // optimistic message (show immediately)
-    const optimistic: Message = {
-      id: tempId,
-      senderId: currentUser._id,
-      receiverId: conversation.id,
-      text,
-      timestamp: new Date().toISOString(),
-      sender: "me",
-      avatar: currentUser.profileImage,
-      files: localFiles,
-      replyTo: replyingMessage || undefined,
-    };
-
-    setMessages((prev) => [...prev, optimistic]);
     scrollToBottom();
 
-    // send to backend (files + text). Backend must emit msg-sent/msg-receive
+  socket.emit("send-msg", {
+  tempId,
+  from: currentUser._id,
+  to: conversation.id,
+  messageText: text,
+  files: localFiles,           // :star: ADD THIS :star:
+  replyToId: replyingMessage?.id || null,
+});
+
+    // send to backend
     const formData = new FormData();
     formData.append("receiverId", conversation.id);
     formData.append("messageText", text);
     formData.append("replyToId", replyingMessage?.id || "");
 
-    files?.forEach((file) => formData.append("files", file));
+    if (files) {
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+    }
 
     try {
       await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
@@ -351,10 +368,8 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
       });
     } catch (err) {
       console.error("Failed to send message to backend:", err);
-      // optional: mark as failed in UI (e.g., set a `failed` flag in message) - left out for brevity
     } finally {
       setReplyingMessage(null);
-      onMessageSent?.(conversation.id, text);
     }
   };
 
@@ -377,11 +392,9 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
         }
       );
       if (!res.ok) throw new Error("Failed to block user");
-      setBlockStatus((s) => ({ ...s, iBlocked: true }));
+      setBlockStatus({ ...blockStatus, iBlocked: true });
       alert("User blocked");
       setHeaderMenuOpen(false);
-      // optimistic emit to notify other side (optional - backend should broadcast)
-      socket.emit("user-blocked", { blockedBy: currentUser?._id, blockedTo: conversation.id });
     } catch (err: any) {
       console.error(err);
       alert(`Error: ${err.message}`);
@@ -404,9 +417,8 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
         }
       );
       if (!res.ok) throw new Error("Failed to unblock user");
-      setBlockStatus((s) => ({ ...s, iBlocked: false }));
+      setBlockStatus({ ...blockStatus, iBlocked: false });
       alert("User unblocked");
-      socket.emit("user-unblocked", { unblockedBy: currentUser?._id, unblockedTo: conversation.id });
     } catch (err: any) {
       console.error(err);
       alert(`Error: ${err.message}`);
@@ -446,9 +458,10 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
     }
   };
 
+  // delete single message
   const handleDelete = async (msgId: string) => {
-    // if optimistic message, just remove locally
-    if (msgId.startsWith("temp-")) return setMessages((prev) => prev.filter((m) => m.id !== msgId));
+    if (msgId.startsWith("temp-"))
+      return setMessages((prev) => prev.filter((m) => m.id !== msgId));
 
     try {
       const token = localStorage.getItem("authToken");
@@ -472,15 +485,68 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
     }
   };
 
+  // reply action
   const handleReply = (msg: Message) => {
     setReplyingMessage(msg);
     setActiveMessageId(null);
   };
 
+  // -------------------------
+  // Report feature
+  // -------------------------
+  const handleSubmitReport = async () => {
+    if (!reportTitle.trim() || !reportDescription.trim()) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const formData = new FormData();
+
+      // ⭐ BACKEND REQUIRES "reportedUser" NOT "reportedUserId"
+      formData.append("reportedUser", conversation.id);
+      formData.append("title", reportTitle);
+      formData.append("description", reportDescription);
+
+      reportImages.forEach((img) => {
+        formData.append("image", img);
+      });
+
+      const res = await fetch(
+        "https://matrimonial-backend-7ahc.onrender.com/api/report/create",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        }
+      );
+
+      const data = await res.json();
+      console.log("Report Response → ", data);
+
+      if (data.success) {
+        alert("Report submitted successfully.");
+        setIsReportOpen(false);
+        setReportTitle("");
+        setReportDescription("");
+        setReportImages([]);
+      } else {
+        alert(data.message || "Failed to submit report");
+      }
+    } catch (err) {
+      console.error("Report error:", err);
+      alert("Failed to submit report");
+    }
+  };
+
+  // -------------------------
+  // Utilities
+  // -------------------------
   const formatTime = (timestamp: string) =>
     new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  const isImage = (fileType: string) => fileType?.startsWith("image/");
+  const isImage = (fileType: string) => fileType.startsWith("image/");
 
   const handleDownload = async (url: string, name: string) => {
     try {
@@ -540,10 +606,15 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
           </button>
 
           {headerMenuOpen && (
-            <div className="absolute right-0 mt-2 w-44 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+            <div className="
+              absolute right-0 mt-2 w-44 
+              bg-white shadow-xl rounded-xl border 
+              z-50 overflow-hidden
+            ">
+              {/* REPORT */}
               <button
                 onClick={() => {
-                  alert("Report UI placeholder");
+                  setIsReportOpen(true);
                   setHeaderMenuOpen(false);
                 }}
                 className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
@@ -578,6 +649,69 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
         </div>
       </div>
 
+      {/* Report Popup */}
+      {isReportOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white w-[92%] sm:w-96 rounded-lg shadow-lg p-5 space-y-4">
+            <h2 className="text-lg font-bold">Report User</h2>
+
+            <input
+              className="w-full border p-2 rounded"
+              placeholder="Enter report title (e.g. Spam)"
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value)}
+            />
+
+            <textarea
+              className="w-full border p-2 rounded h-24"
+              placeholder="Describe the issue…"
+              value={reportDescription}
+              onChange={(e) => setReportDescription(e.target.value)}
+            />
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Upload Proof Images</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setReportImages(Array.from(e.target.files || []))}
+              />
+
+              {reportImages.length > 0 && (
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {reportImages.map((img, i) => (
+                    <div key={i} className="relative w-16 h-16 rounded overflow-hidden border">
+                      <img
+                        src={URL.createObjectURL(img)}
+                        className="w-full h-full object-cover"
+                        alt={`preview-${i}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between pt-2">
+              <button
+                onClick={() => setIsReportOpen(false)}
+                className="px-4 py-2 rounded bg-gray-200"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleSubmitReport}
+                className="px-4 py-2 rounded bg-red-500 text-white"
+              >
+                Submit Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div
         ref={messagesContainerRef}
@@ -598,7 +732,9 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
                 onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${isMe ? "bg-indigo-500 text-white" : "bg-white shadow-sm border"} ${replyingMessage?.id === msg.id ? "ring-2 ring-indigo-400" : ""} relative`}
+                  className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${
+                    isMe ? "bg-indigo-500 text-white" : "bg-white shadow-sm border"
+                  } ${replyingMessage?.id === msg.id ? "ring-2 ring-indigo-400" : ""} relative`}
                 >
                   {msg.replyTo && (
                     <div className="bg-indigo-100 text-indigo-800 p-2 rounded mb-1 border-l-4 border-indigo-500 text-xs font-medium truncate">
@@ -637,7 +773,7 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
                     </div>
                   )}
 
-                  <p className={`text-xs mt-1 ${isMe ? "text-indigo-100" : "text-gray-400"}`}>{formatTime(msg.timestamp)}</p>
+                  <p className="text-xs mt-1 text-gray-300">{formatTime(msg.timestamp)}</p>
 
                   {activeMessageId === msg.id && (
                     <div className="absolute top-0 right-0 bg-white border shadow-lg rounded-md text-sm z-50 flex flex-col overflow-hidden">
@@ -684,7 +820,7 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
         </div>
       )}
 
-      {/* Reply preview */}
+      {/* Instagram Style Reply Preview (Bottom Just Above Input) */}
       {replyingMessage && (
         <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-200 flex items-center justify-between shadow-sm">
           <div className="flex flex-col max-w-[85%]">
@@ -707,7 +843,9 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
       <MessageInput
         onSendMessage={onSendMessage}
         replyingMessage={
-          replyingMessage ? { text: replyingMessage.text || "", id: replyingMessage.id } : undefined
+          replyingMessage
+            ? { text: replyingMessage.text || "", id: replyingMessage.id }
+            : undefined
         }
         onCancelReply={() => setReplyingMessage(null)}
         disabled={blockStatus.blockedMe || blockStatus.iBlocked}
