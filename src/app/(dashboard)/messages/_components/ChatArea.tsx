@@ -18,7 +18,7 @@ interface User {
 interface ChatAreaProps {
   conversation: Conversation;
   currentUser: User | null;
-  socket: Socket; // used for typing/online events, not for sending files/text
+  socket: Socket;
   onOpenSidebar?: () => void;
   onMessageSent?: (conversationId: string, text: string) => void;
 }
@@ -30,20 +30,20 @@ function mapSocketToMessage(
 ): Message {
   return {
     id:
-      msg._id ||
-      msg.tempId ||
-      `msg-${msg.senderId}-${msg.receiverId}-${new Date(msg.createdAt || Date.now()).getTime()}`,
+      (msg as any)._id ||
+      (msg as any).tempId ||
+      `msg-${msg.senderId}-${msg.receiverId}-${new Date((msg as any).createdAt || Date.now()).getTime()}`,
     senderId: msg.senderId,
     receiverId: msg.receiverId,
-    text: msg.messageText || "",
-    timestamp: msg.createdAt || new Date().toISOString(),
+    text: (msg as any).messageText || "",
+    timestamp: (msg as any).createdAt || new Date().toISOString(),
     sender: String(msg.senderId) === String(currentUser._id) ? "me" : "other",
     avatar:
       String(msg.senderId) === String(currentUser._id)
-        ? currentUser.profileImage || "/my-avatar.png"
+        ? currentUser?.profileImage || "/my-avatar.png"
         : conversation.avatar,
-    files: (msg.files || []) as MessageFile[],
-    replyTo: msg.replyTo ? mapSocketToMessage(msg.replyTo as SocketMessage, currentUser, conversation) : undefined,
+    files: (msg as any).files || [],
+    replyTo: (msg as any).replyTo ? mapSocketToMessage((msg as any).replyTo, currentUser, conversation) : undefined,
   };
 }
 
@@ -79,43 +79,46 @@ export default function ChatArea({
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
 
   // -------------------------
-  // Socket listeners (typing/online + msg events)
+  // Socket listeners
   // -------------------------
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
-    // msg-sent: sender should process this (server confirms stored message)
     const handleSentMessage = (msg: SocketMessage) => {
       try {
+        // Only process msg-sent for the sender (confirmation)
         if (String(msg.senderId) !== String(currentUser._id)) return;
         if (String(msg.receiverId) !== String(conversation.id)) return;
 
         setMessages((prev) => {
-          const newMsg = mapSocketToMessage(msg, currentUser, conversation);
+          const mapped = mapSocketToMessage(msg, currentUser, conversation);
 
-          // replace optimistic
-          if (msg.tempId) {
-            return prev.map((m) => (m.id === msg.tempId ? newMsg : m));
+          // Replace optimistic message if tempId present
+          if ((msg as any).tempId) {
+            return prev.map((m) => (m.id === (msg as any).tempId ? mapped : m));
           }
 
-          // dedupe
-          if (prev.some((m) => m.id === msg._id)) return prev;
+          // Avoid duplicate if real id exists
+          if (prev.some((m) => m.id === (msg as any)._id)) return prev;
 
-          return [...prev, newMsg];
+          return [...prev, mapped];
         });
       } catch (err) {
         console.error("handleSentMessage error:", err);
       }
     };
 
-    // msg-receive: receiver should process this
     const handleIncomingMessage = (msg: SocketMessage) => {
       try {
+        // IMPORTANT: prevent sender from processing msg-receive (ignore server sending back to sender)
+        if (String(msg.senderId) === String(currentUser._id)) return;
+
+        // Only process if receiver is me and sender matches conversation partner
         if (String(msg.receiverId) !== String(currentUser._id)) return;
         if (String(msg.senderId) !== String(conversation.id)) return;
 
         setMessages((prev) => {
-          if (prev.some((m) => m.id === msg._id)) return prev;
+          if (prev.some((m) => m.id === (msg as any)._id)) return prev;
           return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
         });
 
@@ -269,7 +272,7 @@ export default function ChatArea({
 
   // -------------------------
   // Send message (optimistic UI + API upload)
-  // IMPORTANT: Do NOT emit socket here. Server will emit msg-sent/msg-receive after saving.
+  // Do NOT emit socket here (server will emit after saving).
   // -------------------------
   const onSendMessage = async (text: string, files?: File[]) => {
     if (!currentUser || !conversation.id) return;
@@ -278,7 +281,6 @@ export default function ChatArea({
     const token = localStorage.getItem("authToken");
     const tempId = "temp-" + Date.now();
 
-    // local preview files
     const localFiles =
       files?.length
         ? files.map((file) => ({
@@ -289,7 +291,7 @@ export default function ChatArea({
           }))
         : [];
 
-    // optimistic message
+    // optimistic message (show immediately)
     setMessages((prev) => [
       ...prev,
       {
@@ -307,7 +309,7 @@ export default function ChatArea({
 
     scrollToBottom();
 
-    // send to backend (files + text). Backend will emit msg-sent & msg-receive
+    // send to backend (files + text). Backend must emit msg-sent/msg-receive
     const formData = new FormData();
     formData.append("receiverId", conversation.id);
     formData.append("messageText", text);
@@ -323,7 +325,7 @@ export default function ChatArea({
       });
     } catch (err) {
       console.error("Failed to send message to backend:", err);
-      // optionally mark failed on UI (not implemented)
+      // optional: mark as failed in UI
     } finally {
       setReplyingMessage(null);
       onMessageSent?.(conversation.id, text);
@@ -415,7 +417,6 @@ export default function ChatArea({
     }
   };
 
-  // delete single message
   const handleDelete = async (msgId: string) => {
     if (msgId.startsWith("temp-")) return setMessages((prev) => prev.filter((m) => m.id !== msgId));
 
@@ -441,13 +442,11 @@ export default function ChatArea({
     }
   };
 
-  // reply action
   const handleReply = (msg: Message) => {
     setReplyingMessage(msg);
     setActiveMessageId(null);
   };
 
-  // utilities
   const formatTime = (timestamp: string) =>
     new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -511,8 +510,7 @@ export default function ChatArea({
             <div className="absolute right-0 mt-2 w-44 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
               <button
                 onClick={() => {
-                  // placeholder for report UI
-                  alert("Open Report UI (implement modal)");
+                  alert("Report UI placeholder");
                   setHeaderMenuOpen(false);
                 }}
                 className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
