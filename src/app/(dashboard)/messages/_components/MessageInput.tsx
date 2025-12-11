@@ -9,7 +9,6 @@ interface MessageInputProps {
   onCancelReply?: () => void;
   disabled?: boolean;
 
-  /* 🔥 Required for typing feature */
   socket: any;
   currentUser: { _id: string } | null;
   to: string;
@@ -22,9 +21,8 @@ export default function MessageInput({
   disabled,
   socket,
   currentUser,
-  to
+  to,
 }: MessageInputProps) {
-
   const [message, setMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,10 +35,9 @@ export default function MessageInput({
 
   /* Auto-resize textarea */
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
+    if (!textareaRef.current) return;
+    textareaRef.current.style.height = "auto";
+    textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
   }, [message]);
 
   /* Emit typing event */
@@ -52,7 +49,7 @@ export default function MessageInput({
       isTypingRef.current = true;
     }
 
-    if (typingTimeout.current) window.clearTimeout(typingTimeout.current);
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
 
     typingTimeout.current = window.setTimeout(() => {
       socket.emit("stop-typing", { from: currentUser._id, to });
@@ -61,7 +58,7 @@ export default function MessageInput({
   };
 
   /* Send message */
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: any) => {
     e.preventDefault();
 
     if (!message.trim() && selectedFiles.length === 0) return;
@@ -77,7 +74,7 @@ export default function MessageInput({
     }
   };
 
-  /* Enter-to-send */
+  /* ENTER-to-send */
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -86,63 +83,59 @@ export default function MessageInput({
   };
 
   /* File selection */
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files as FileList);
-      setSelectedFiles((prev) => [...prev, ...files]);
-      e.target.value = "";
-    }
+  const handleFileChange = (e: any) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files as FileList);
+    setSelectedFiles((prev) => [...prev, ...files]);
+    e.target.value = "";
   };
 
-  /* Remove single file */
+  /* Remove one file */
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  /* Drag and Drop */
-  const handleDragOver = (e: React.DragEvent) => {
+  /* Drag + Drop handlers */
+  const handleDragOver = (e: any) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
   const handleDragLeave = () => setIsDragging(false);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: any) => {
     e.preventDefault();
     setIsDragging(false);
+
     if (e.dataTransfer.files?.length) {
       setSelectedFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files)]);
     }
   };
 
-  /* Cleanup typing event on unmount */
+  /* Cleanup typing on unmount */
   useEffect(() => {
     return () => {
-      if (typingTimeout.current) window.clearTimeout(typingTimeout.current);
-
+      if (typingTimeout.current) clearTimeout(typingTimeout.current);
       if (isTypingRef.current && socket && currentUser) {
         socket.emit("stop-typing", { from: currentUser._id, to });
-        isTypingRef.current = false;
       }
     };
   }, []);
 
   return (
     <div
-      className={`p-4 border-t border-gray-200 bg-white ${
-        isDragging ? "bg-indigo-50 border-indigo-400" : ""
-      }`}
+      className={`p-4 border-t bg-white ${isDragging ? "bg-indigo-50 border-indigo-500" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Selected Files Preview */}
+      {/* Selected files preview */}
       {selectedFiles.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
-          {selectedFiles.map((file, index) => (
+          {selectedFiles.map((file, i) => (
             <div
-              key={index}
-              className="flex items-center bg-gray-100 px-2 py-1 rounded-lg border border-gray-200"
+              key={i}
+              className="flex items-center bg-gray-100 border px-2 py-1 rounded-lg"
             >
               {file.type.startsWith("image/") ? (
                 <ImageIcon className="w-4 h-4 mr-1 text-gray-600" />
@@ -150,7 +143,7 @@ export default function MessageInput({
                 <FileText className="w-4 h-4 mr-1 text-gray-600" />
               )}
               <span className="text-xs truncate max-w-[120px]">{file.name}</span>
-              <button type="button" onClick={() => removeFile(index)}>
+              <button type="button" onClick={() => removeFile(i)}>
                 <X size={14} />
               </button>
             </div>
@@ -158,54 +151,69 @@ export default function MessageInput({
         </div>
       )}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="flex items-end space-x-3">
-        {/* Attach file */}
+      {/* Replying preview (Instagram-style small bar) */}
+      {replyingMessage && (
+        <div className="flex items-center justify-between bg-indigo-50 border-l-4 border-indigo-600 px-3 py-2 rounded mb-2">
+          <div className="truncate max-w-[75%] text-indigo-700 text-sm">
+            Replying to: <span className="font-semibold">{replyingMessage.text}</span>
+          </div>
+          <button onClick={onCancelReply} className="text-indigo-600 font-bold">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Input form */}
+      <form onSubmit={handleSubmit} className="flex items-end gap-3">
+        {/* Upload button */}
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="p-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => fileInputRef.current?.click()}
+          className="p-3 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-60"
         >
           <Paperclip className="w-5 h-5 text-gray-600" />
         </button>
 
-        <input type="file" multiple ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
 
         {/* Textarea */}
-        <div className="flex-1">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              emitTyping();
-            }}
-            onKeyPress={handleKeyPress}
-            disabled={disabled}
-            placeholder={disabled ? "You cannot send messages" : "Type your message..."}
-            className="w-full resize-none border border-gray-200 rounded-lg px-4 py-3 
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500 
-                       disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
-            rows={1}
-            style={{ minHeight: "44px", maxHeight: "200px" }}
-          />
-        </div>
+        <textarea
+          ref={textareaRef}
+          value={message}
+          disabled={disabled}
+          placeholder={disabled ? "You cannot send messages" : "Type your message..."}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            emitTyping();
+          }}
+          onKeyPress={handleKeyPress}
+          rows={1}
+          className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500
+                     disabled:opacity-50 overflow-hidden"
+          style={{ minHeight: "44px", maxHeight: "180px" }}
+        />
 
         {/* Send button */}
         <button
           type="submit"
           disabled={disabled || (!message.trim() && selectedFiles.length === 0)}
-          className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-3 rounded-lg 
-                     hover:from-indigo-600 hover:to-purple-700 
-                     disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg 
+                     disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
         >
-          <Send className="h-5 w-5" />
+          <Send className="w-5 h-5" />
         </button>
       </form>
 
       {isDragging && (
-        <p className="text-sm text-indigo-600 mt-2">Drop files here to upload</p>
+        <p className="text-sm text-indigo-600 mt-2">Drop files to upload</p>
       )}
     </div>
   );
