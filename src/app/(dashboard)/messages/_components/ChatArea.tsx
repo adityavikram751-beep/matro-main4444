@@ -1,4 +1,4 @@
-// ChatArea.tsx
+// ChatArea.tsx (PART 1/3)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +23,9 @@ interface ChatAreaProps {
   onMessageSent?: (conversationId: string, text: string) => void;
 }
 
+/**
+ * normalize socket payload -> Message used by UI
+ */
 function mapSocketToMessage(
   msg: SocketMessage,
   currentUser: User,
@@ -84,9 +87,12 @@ export default function ChatArea({
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
+    /**
+     * msg-sent: confirmation from server for messages I sent.
+     * Replace optimistic messages (tempId) or append if missing.
+     */
     const handleSentMessage = (msg: SocketMessage) => {
       try {
-        // Only process msg-sent for the sender (confirmation)
         if (String(msg.senderId) !== String(currentUser._id)) return;
         if (String(msg.receiverId) !== String(conversation.id)) return;
 
@@ -108,13 +114,20 @@ export default function ChatArea({
       }
     };
 
+    /**
+     * msg-receive: incoming message for me.
+     * IMPORTANT: prevent sender (me) from processing msg-receive.
+     * Many duplicate cases happen because server may broadcast back — this guards against it.
+     */
     const handleIncomingMessage = (msg: SocketMessage) => {
       try {
-        // IMPORTANT: prevent sender from processing msg-receive (ignore server sending back to sender)
+        // Sender should never process msg-receive (ignore messages where I am sender)
         if (String(msg.senderId) === String(currentUser._id)) return;
 
-        // Only process if receiver is me and sender matches conversation partner
+        // Only process when I am the intended receiver
         if (String(msg.receiverId) !== String(currentUser._id)) return;
+
+        // Only accept messages from the conversation partner
         if (String(msg.senderId) !== String(conversation.id)) return;
 
         setMessages((prev) => {
@@ -167,7 +180,7 @@ export default function ChatArea({
       socket.off("user-offline", handleUserOffline);
     };
   }, [socket, currentUser, conversation]);
-
+// ChatArea.tsx (PART 2/3)
   // close active message menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -465,7 +478,7 @@ export default function ChatArea({
       console.error("Download error:", err);
     }
   };
-
+// ChatArea.tsx (PART 3/3)
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
