@@ -1,4 +1,3 @@
-
 type InboxProps = {
   selected: string;
   onChange: (tab: string) => void;
@@ -8,7 +7,7 @@ export default function Inbox({ selected, onChange }: InboxProps) {
   const tabs = ["Received", "Accepted", "Sent", "Rejected"];
 
   return (
-    <div className="flex gap-6 border-b text-sm sm:text-base px-4 py-2  w-full shadow-2xs">
+    <div className="flex gap-6 border-b text-sm sm:text-base px-4 py-2 w-full shadow-md">
       {tabs.map((tab) => (
         <button
           key={tab}

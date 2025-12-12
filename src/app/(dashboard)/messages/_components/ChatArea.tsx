@@ -21,6 +21,9 @@ interface ChatAreaProps {
   onOpenSidebar: () => void;
 }
 
+/**
+ * Map socket/raw shape to our Message shape used in UI
+ */
 function mapSocketToMessage(msg: any, currentUser: User, conversation: Conversation): Message {
   return {
     id: msg._id || msg.tempId || `msg-${Date.now()}`,
@@ -35,7 +38,8 @@ function mapSocketToMessage(msg: any, currentUser: User, conversation: Conversat
         : conversation.avatar,
     files: msg.files || [],
     replyTo: msg.replyTo
-      ? mapSocketToMessage(msg.replyTo, currentUser, conversation)
+      ? // avoid infinite recursion if replyTo is simple id - handle gracefully
+        (typeof msg.replyTo === "object" ? mapSocketToMessage(msg.replyTo, currentUser, conversation) : undefined)
       : undefined,
   };
 }
@@ -58,16 +62,18 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
+  // Helpers
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") =>
     messagesEndRef.current?.scrollIntoView({ behavior });
 
   const isAtBottom = () => {
     if (!messagesContainerRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-    return scrollTop + clientHeight >= scrollHeight - 100;
+    return scrollTop + clientHeight >= scrollHeight - 120;
   };
 
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
+
   // -------------------------
   // Socket listeners (robust & normalized)
   // -------------------------
@@ -172,6 +178,7 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
       const whoBlocked = data.blockedBy || data.by;
       if (whoBlocked === conversation.id) {
         setBlockStatus((prev) => ({ ...prev, blockedMe: true }));
+        // toast / alert - keep minimal
         alert("This user has blocked you.");
       }
     };
@@ -228,8 +235,9 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
   useEffect(() => {
     if (conversation) {
       setShouldAutoScroll(true);
-      setTimeout(() => scrollToBottom("instant"), 100);
+      setTimeout(() => scrollToBottom("instant" as ScrollBehavior), 120);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id]);
 
   // Fetch messages for conversation
@@ -306,6 +314,7 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
     };
     fetchOnlineStatus();
   }, [conversation.id]);
+
   // -------------------------
   // Send message (optimistic UI)
   // -------------------------
@@ -387,6 +396,10 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
       setReplyingMessage(null);
     }
   };
+
+  // -------------------------
+  // Message actions (delete, block, unblock, reply)
+  // -------------------------
   const handleDelete = async (msgId: string) => {
     // remove temp message locally
     if (msgId.startsWith("temp-"))
@@ -411,9 +424,10 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
       setActiveMessageId(null);
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || "Failed to delete");
     }
   };
+
   const handleDeleteAllChat = async () => {
     if (!conversation.id) return;
     if (!confirm("Delete entire chat?")) return;
@@ -444,9 +458,68 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
 
       setHeaderMenuOpen(false);
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || "Failed to delete chat");
     }
   };
+
+  const handleBlockUser = async () => {
+    if (!conversation.id) return;
+    try {
+      const token = localStorage.getItem("authToken");
+      const res = await fetch(
+        `https://matrimonial-backend-7ahc.onrender.com/api/message/block/${conversation.id}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        setBlockStatus((prev) => ({ ...prev, iBlocked: true }));
+        alert("User blocked");
+      } else {
+        alert(data.message || "Failed to block user");
+      }
+    } catch (err) {
+      console.error("Block user error:", err);
+      alert("Failed to block user");
+    } finally {
+      setHeaderMenuOpen(false);
+    }
+  };
+
+  const handleUnblockUser = async () => {
+    if (!conversation.id) return;
+    try {
+      const token = localStorage.getItem("authToken");
+      const res = await fetch(
+        `https://matrimonial-backend-7ahc.onrender.com/api/message/unblock/${conversation.id}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        setBlockStatus((prev) => ({ ...prev, iBlocked: false }));
+        alert("User unblocked");
+      } else {
+        alert(data.message || "Failed to unblock user");
+      }
+    } catch (err) {
+      console.error("Unblock user error:", err);
+      alert("Failed to unblock user");
+    } finally {
+      setHeaderMenuOpen(false);
+    }
+  };
+
+  const handleReply = (msg: Message) => {
+    setReplyingMessage(msg);
+    setActiveMessageId(null);
+    // focus input could be handled via MessageInput prop if needed
+  };
+
   const handleSubmitReport = async () => {
     if (!reportTitle.trim() || !reportDescription.trim()) {
       alert("Fill all fields");
@@ -484,12 +557,12 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
         alert(data.message || "Failed to submit report");
       }
     } catch (err) {
+      console.error("Error submitting report", err);
       alert("Error submitting report");
     }
   };
-  // -------------------------
+
   // Utilities
-  // -------------------------
   const formatTime = (timestamp: string) =>
     new Date(timestamp).toLocaleTimeString([], {
       hour: "2-digit",
@@ -497,7 +570,7 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
     });
 
   const isImage = (fileType: string) =>
-    fileType?.startsWith?.("image/") || fileType.includes("png") || fileType.includes("jpg");
+    !!fileType && (fileType.startsWith?.("image/") || fileType.includes("png") || fileType.includes("jpg"));
 
   const handleDownload = async (url: string, name: string) => {
     try {
@@ -513,41 +586,53 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
     }
   };
 
+  // Responsive helper classes (kept minimal & semantic)
+  const bubbleBase = "p-3 max-w-[78%] md:max-w-[60%] rounded-2xl relative";
+  const meBubble = "bg-indigo-600 text-white self-end";
+  const otherBubble = "bg-white border shadow-sm self-start";
+
   // -------------------------
   // RENDER UI
   // -------------------------
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full min-h-0">
       {/* HEADER */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between relative">
-        <button onClick={onOpenSidebar} className="md:hidden">
-          ☰
-        </button>
+      <div className="bg-white border-b border-gray-200 p-3 md:p-4 shadow-sm flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onOpenSidebar}
+            className="md:hidden p-2 rounded-md hover:bg-gray-100"
+            aria-label="Open sidebar"
+          >
+            ☰
+          </button>
 
-        <div className="flex items-center space-x-3">
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             {conversation.avatar ? (
               <Image
                 src={conversation.avatar}
                 alt={conversation.name}
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full object-cover"
+                width={56}
+                height={56}
+                className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover"
               />
             ) : (
-              <div className="w-12 h-12 bg-indigo-600 text-white grid place-items-center rounded-full">
+              <div className="w-12 h-12 md:w-14 md:h-14 bg-indigo-600 text-white grid place-items-center rounded-full text-lg">
                 {conversation.name?.charAt(0).toUpperCase()}
               </div>
             )}
 
             {conversationOnline && (
-              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 md:w-3.5 md:h-3.5 bg-green-500 border-2 border-white rounded-full"
+                aria-hidden
+              />
             )}
           </div>
 
-          <div>
-            <h2 className="font-semibold">{conversation.name}</h2>
-            <p className={`${conversationOnline ? "text-green-600" : "text-gray-500"} text-sm`}>
+          <div className="min-w-0">
+            <h2 className="font-semibold text-sm md:text-base truncate">{conversation.name}</h2>
+            <p className={`${conversationOnline ? "text-green-600" : "text-gray-500"} text-xs md:text-sm truncate`}>
               {conversationOnline ? "Online" : "Offline"}
             </p>
           </div>
@@ -558,12 +643,14 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
           <button
             onClick={() => setHeaderMenuOpen((p) => !p)}
             className="p-2 rounded-full hover:bg-gray-100"
+            aria-haspopup="true"
+            aria-expanded={headerMenuOpen}
           >
-            <MoreVertical size={20} />
+            <MoreVertical size={18} />
           </button>
 
           {headerMenuOpen && (
-            <div className="absolute right-0 top-10 bg-white shadow-lg rounded-lg border w-44 z-50">
+            <div className="absolute right-0 mt-2 bg-white shadow-lg rounded-lg border w-44 z-50">
               <button
                 onClick={() => {
                   setHeaderMenuOpen(false);
@@ -600,19 +687,23 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
 
       {/* REPORT POPUP */}
       {isReportOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-[90%] max-w-md rounded-xl p-5 shadow-xl">
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white w-full max-w-md rounded-xl p-5 shadow-xl">
             <h2 className="text-lg font-semibold">Report User</h2>
 
             <input
-              className="w-full border p-2 rounded mt-3"
+              className="w-full border p-2 rounded mt-3 text-sm"
               placeholder="Report title (e.g. Spam)"
               value={reportTitle}
               onChange={(e) => setReportTitle(e.target.value)}
             />
 
             <textarea
-              className="w-full border p-2 rounded h-24 mt-3"
+              className="w-full border p-2 rounded h-28 mt-3 text-sm"
               placeholder="Describe issue"
               value={reportDescription}
               onChange={(e) => setReportDescription(e.target.value)}
@@ -622,7 +713,7 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
               type="file"
               multiple
               accept="image/*"
-              className="mt-2"
+              className="mt-2 text-sm"
               onChange={(e) => setReportImages(Array.from(e.target.files || []))}
             />
 
@@ -633,16 +724,23 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
                     key={i}
                     src={URL.createObjectURL(img)}
                     className="w-16 h-16 object-cover rounded border"
+                    alt={`report-${i}`}
                   />
                 ))}
               </div>
             )}
 
             <div className="flex justify-between mt-4">
-              <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => setIsReportOpen(false)}>
+              <button
+                className="px-4 py-2 bg-gray-200 rounded text-sm"
+                onClick={() => setIsReportOpen(false)}
+              >
                 Cancel
               </button>
-              <button className="px-4 py-2 bg-red-600 text-white rounded" onClick={handleSubmitReport}>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded text-sm"
+                onClick={handleSubmitReport}
+              >
                 Submit
               </button>
             </div>
@@ -654,103 +752,126 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100"
+        className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 bg-gray-50"
+        style={{ WebkitOverflowScrolling: "touch" }}
       >
         {isLoading ? (
-          <p className="text-gray-500 text-center">Loading messages...</p>
+          <p className="text-gray-500 text-center text-sm">Loading messages...</p>
         ) : messages.length === 0 ? (
-          <p className="text-gray-500 text-center">No messages yet</p>
+          <p className="text-gray-500 text-center text-sm">No messages yet</p>
         ) : (
-          messages.map((msg) => {
-            const isMe = msg.sender === "me";
+          <div className="flex flex-col gap-3">
+            {messages.map((msg) => {
+              const isMe = msg.sender === "me";
 
-            return (
-              <div
-                key={msg.id}
-                className={`flex ${isMe ? "justify-end" : "justify-start"} message-bubble`}
-                onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}
-              >
+              return (
                 <div
-                  className={`p-3 max-w-xs lg:max-w-md rounded-2xl relative ${
-                    isMe ? "bg-indigo-500 text-white" : "bg-white border shadow-sm"
-                  }`}
+                  key={msg.id}
+                  className={`flex ${isMe ? "justify-end" : "justify-start"} message-bubble`}
+                  onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}
                 >
-                  {/* Reply preview inside bubble */}
-                  {msg.replyTo && (
-                    <div className="border-l-4 border-indigo-500 bg-indigo-100 text-indigo-800 p-2 rounded text-xs mb-2">
-                      {msg.replyTo.text || "Media"}
-                    </div>
-                  )}
-
-                  {/* TEXT */}
-                  {msg.text && <p className="text-sm mb-1">{msg.text}</p>}
-
-                  {/* FILES / IMAGES */}
-                  {msg.files?.length > 0 && (
-                    <div className="mt-2 space-y-2">
-                      {msg.files.map((file, i) => (
-                        <div key={i} className="rounded-lg border overflow-hidden">
-                          {isImage(file.fileType) ? (
-                            <img
-                              src={file.fileUrl}
-                              className="w-full h-auto max-h-40 object-cover cursor-pointer"
-                              onClick={() => window.open(file.fileUrl, "_blank")}
-                            />
-                          ) : (
-                            <div className="bg-gray-50 p-2 flex items-center gap-3">
-                              <FileText size={20} className="text-gray-600" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium truncate">{file.fileName}</p>
-                                <p className="text-xs text-gray-500">
-                                  {(file.fileSize / 1024).toFixed(1)} KB
-                                </p>
-                              </div>
-                              <button onClick={() => window.open(file.fileUrl, "_blank")}>
-                                <Eye size={16} />
-                              </button>
-                              <button onClick={() => handleDownload(file.fileUrl, file.fileName)}>
-                                <Download size={16} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* TIME */}
-                  <p className="text-xs mt-1 opacity-70">{formatTime(msg.timestamp)}</p>
-
-                  {/* MESSAGE ACTION MENU */}
-                  {activeMessageId === msg.id && (
-                    <div className="absolute top-0 right-0 bg-white shadow-lg rounded border text-sm overflow-hidden z-50">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReply(msg);
-                        }}
-                        className="px-4 py-2 hover:bg-gray-100"
+                  <div
+                    className={`${bubbleBase} ${isMe ? meBubble : otherBubble} break-words`}
+                    style={{ wordBreak: "break-word" }}
+                    role="article"
+                    aria-label={isMe ? "Your message" : `${conversation.name} message`}
+                  >
+                    {/* Reply preview inside bubble */}
+                    {msg.replyTo && (
+                      <div
+                        className={`border-l-4 px-2 py-1 rounded text-xs mb-2 ${
+                          isMe ? "border-indigo-300 bg-indigo-700/10 text-indigo-900" : "border-indigo-500 bg-indigo-50 text-indigo-800"
+                        }`}
                       >
-                        Reply
-                      </button>
+                        <div className="truncate max-w-[70%]">
+                          {msg.replyTo.text || "Media"}
+                        </div>
+                      </div>
+                    )}
 
-                      {isMe && (
+                    {/* TEXT */}
+                    {msg.text && <p className="text-sm mb-2">{msg.text}</p>}
+
+                    {/* FILES / IMAGES */}
+                    {msg.files?.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        {msg.files.map((file, i) => (
+                          <div key={i} className="rounded-lg border overflow-hidden">
+                            {isImage(file.fileType) ? (
+                              <img
+                                src={file.fileUrl}
+                                className="w-full h-auto max-h-64 object-cover cursor-pointer"
+                                onClick={() => window.open(file.fileUrl, "_blank")}
+                                alt={file.fileName || "image"}
+                              />
+                            ) : (
+                              <div className="bg-gray-50 p-2 flex items-center gap-3">
+                                <FileText size={20} className="text-gray-600" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium truncate">{file.fileName}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : ""}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(file.fileUrl, "_blank");
+                                  }}
+                                  aria-label="View file"
+                                >
+                                  <Eye size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownload(file.fileUrl, file.fileName);
+                                  }}
+                                  aria-label="Download file"
+                                >
+                                  <Download size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* TIME */}
+                    <p className="text-xs mt-2 opacity-70 text-right">{formatTime(msg.timestamp)}</p>
+
+                    {/* MESSAGE ACTION MENU */}
+                    {activeMessageId === msg.id && (
+                      <div className="absolute top-0 right-0 bg-white shadow-lg rounded border text-sm overflow-hidden z-50">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete(msg.id);
+                            handleReply(msg);
                           }}
-                          className="px-4 py-2 text-red-600 hover:bg-gray-100"
+                          className="px-4 py-2 hover:bg-gray-100"
                         >
-                          Delete
+                          Reply
                         </button>
-                      )}
-                    </div>
-                  )}
+
+                        {msg.sender === "me" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(msg.id);
+                            }}
+                            className="px-4 py-2 text-red-600 hover:bg-gray-100"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
 
         <div ref={messagesEndRef} />
@@ -758,13 +879,13 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
 
       {/* BLOCK NOTICE */}
       {blockStatus.blockedMe && (
-        <div className="bg-red-200 text-red-800 p-2 text-center">You are blocked by this user</div>
+        <div className="bg-red-200 text-red-800 p-2 text-center text-sm">You are blocked by this user</div>
       )}
 
       {blockStatus.iBlocked && !blockStatus.blockedMe && (
-        <div className="bg-yellow-100 text-yellow-700 p-2 flex items-center justify-center gap-2">
+        <div className="bg-yellow-100 text-yellow-700 p-2 flex items-center justify-center gap-2 text-sm">
           <span>You have blocked this user.</span>
-          <button onClick={handleUnblockUser} className="underline font-semibold">
+          <button onClick={handleUnblockUser} className="underline font-semibold text-sm">
             Unblock
           </button>
         </div>
@@ -772,32 +893,34 @@ export default function ChatArea({ conversation, currentUser, socket, onOpenSide
 
       {/* REPLY PREVIEW ABOVE INPUT */}
       {replyingMessage && (
-        <div className="bg-indigo-50 px-4 py-2 border-t border-indigo-200 flex justify-between">
-          <div>
+        <div className="bg-indigo-50 px-4 py-2 border-t border-indigo-200 flex justify-between items-center">
+          <div className="min-w-0">
             <p className="text-xs text-indigo-700">Replying to</p>
-            <p className="font-medium text-indigo-900 truncate max-w-[230px]">
+            <p className="font-medium text-indigo-900 truncate max-w-[70vw]">
               {replyingMessage.text || "Media"}
             </p>
           </div>
 
-          <button onClick={() => setReplyingMessage(null)} className="text-indigo-600 font-bold">
+          <button onClick={() => setReplyingMessage(null)} className="text-indigo-600 font-bold ml-3">
             ✕
           </button>
         </div>
       )}
 
-      {/* MESSAGE INPUT BOX */}
-      <MessageInput
-        onSendMessage={onSendMessage}
-        replyingMessage={
-          replyingMessage ? { text: replyingMessage.text || "", id: replyingMessage.id } : undefined
-        }
-        onCancelReply={() => setReplyingMessage(null)}
-        disabled={blockStatus.iBlocked || blockStatus.blockedMe}
-        socket={socket}
-        currentUser={currentUser}
-        to={conversation.id}
-      />
+      {/* MESSAGE INPUT BOX - pinned at bottom visually */}
+      <div className="border-t border-gray-200 bg-white p-3 md:p-4">
+        <MessageInput
+          onSendMessage={onSendMessage}
+          replyingMessage={
+            replyingMessage ? { text: replyingMessage.text || "", id: replyingMessage.id } : undefined
+          }
+          onCancelReply={() => setReplyingMessage(null)}
+          disabled={blockStatus.iBlocked || blockStatus.blockedMe}
+          socket={socket}
+          currentUser={currentUser}
+          to={conversation.id}
+        />
+      </div>
     </div>
   );
 }

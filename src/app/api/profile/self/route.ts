@@ -7,5 +7,8 @@ export async function GET() {
     image: 'https://randomuser.me/api/portraits/men/1.jpg',
   };
 
-  return NextResponse.json({ success: true, data: user });
+  return NextResponse.json({
+    success: true,
+    data: user,
+  });
 }

@@ -93,7 +93,7 @@ export default function MatrimonialApp() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ⭐ SECOND TOP BAR (TABS) FIXED BELOW MAIN NAV */}
+      {/* ⭐ FIXED TABS BAR — PERFECT RESPONSIVE, NO GAP */}
       <div className="fixed top-[70px] left-0 w-full z-40 bg-white border-b shadow-sm">
         <NavigationTabs
           activeTab={activeTab}
@@ -102,12 +102,20 @@ export default function MatrimonialApp() {
         />
       </div>
 
-      {/* ⭐ MAIN CONTENT (padding so fixed tabbar doesn’t overlap) */}
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4 pt-[60px]">
+      {/* ⭐ MAIN CONTENT — PERFECT RESPONSIVE SPACING */}
+      <div
+        className="
+          max-w-4xl mx-auto 
+          px-3 sm:px-4 
+          pt-[130px]   /* ✔ Navbar (70px) + Tabs (60px) ka perfect spacing */
+          pb-10 
+          space-y-4
+        "
+      >
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-400 border-t-transparent"></div>
           </div>
         ) : error ? (
           <div className="text-center py-8 text-red-600">{error}</div>

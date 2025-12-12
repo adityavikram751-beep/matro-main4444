@@ -405,168 +405,234 @@ export default function MatrimonialApp() {
     return [];
   }, [activeTab, receivedProfiles, acceptedProfiles, sentProfiles, rejectedProfiles]);
 
+  /* -------------------- PROFILE CARD (RESPONSIVE) -------------------- */
+
   function ProfileCard({ profile }: { profile: Profile }) {
     return (
-      <Card className="p-6 bg-white rounded-lg border border-[#7D0A0A]">
-        <div className="flex items-start space-x-6">
-          <div className="flex-shrink-0">
-            <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 border border-gray-300">
+      <Card className="p-4 sm:p-6 bg-white rounded-lg border border-[#7D0A0A] w-full">
+
+        <div className="flex flex-col sm:flex-row sm:items-start sm:space-x-6 space-y-4 sm:space-y-0">
+
+          {/* IMAGE */}
+          <div className="flex-shrink-0 mx-auto sm:mx-0">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-gray-200 border border-gray-300">
               <a href={`./requests/${profile.id}`}>
-                <Image src={profile.image || placeholderImage} alt={profile.name} width={96} height={96} className="w-full h-full object-cover" />
+                <Image
+                  src={profile.image || placeholderImage}
+                  alt={profile.name}
+                  width={96}
+                  height={96}
+                  className="w-full h-full object-cover"
+                />
               </a>
             </div>
           </div>
 
+          {/* MIDDLE CONTENT */}
           <div className="flex-1 min-w-0">
+
             <div className="flex items-start justify-between">
-              <div className="border-b border-[#757575] w-full font-Lato">
-                <h3 className="text-lg font-semibold font-Lato text-[#1E1E1E] mb-1">{profile.name}</h3>
-                <p className="text-sm text-[#7A7A7A] mb-3">
+              <div className="border-b border-[#757575] w-full pb-1">
+                <h3 className="text-lg font-semibold font-Lato text-[#1E1E1E] mb-1 break-words">
+                  {profile.name}
+                </h3>
+                <p className="text-sm text-[#7A7A7A] mb-2 break-words">
                   {profile.profileId} | {profile.lastSeen}
                 </p>
               </div>
             </div>
 
-            <div className="space-y-1 text-sm mt-2 text-regular">
+            <div className="space-y-1 text-sm mt-2 text-regular break-words">
               <p className="text-[#1E1E1E]">
-                <span className="font-Lato">{profile.age} Yrs</span> . {profile.height} . {profile.caste}
+                <span className="font-Lato">{profile.age} Yrs</span> · {profile.height} · {profile.caste}
               </p>
-              <p className="text-[#1E1E1E]">
-                {profile.profession} . {profile.salary}
-              </p>
+              <p className="text-[#1E1E1E]">{profile.profession} · {profile.salary}</p>
               <p className="text-[#1E1E1E]">{profile.education}</p>
               <p className="text-[#1E1E1E]">{profile.location}</p>
               <p className="text-[#1E1E1E]">{profile.languages.join(", ")}</p>
             </div>
           </div>
 
-          <div className="flex flex-col space-y-3 items-center border-l border-[#757575] w-[268px] px-8">
+          {/* ACTIONS RIGHT SIDE — MAKING RESPONSIVE */}
+          <div className="
+            flex flex-col space-y-3 items-center 
+            border-t sm:border-t-0 sm:border-l border-[#757575]
+            w-full sm:w-[220px] pt-4 sm:pt-0 sm:px-4
+          ">
+
+            {/* RECEIVED TAB */}
             {activeTab === "Received" && (
               <>
-                <div className="flex gap-6 items-center">
-                  <div className="text-regular text-[#000000] mb-2 font-Lato ml-16">Accept</div>
-                  <Button variant="outline" size="icon" className="group h-12 w-12 rounded-full border-2 border-[#4bb65b] bg-transparent hover:bg-[#4bb65b]" onClick={() => handleUpdateStatus(profile, "accepted")}>
+                {/* Accept */}
+                <div className="flex items-center justify-between w-full sm:justify-start sm:gap-4">
+                  <span className="text-sm font-Lato text-[#000000]">Accept</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="group h-10 w-10 sm:h-12 sm:w-12 rounded-full border-2 border-[#4bb65b] bg-transparent hover:bg-[#4bb65b]"
+                    onClick={() => handleUpdateStatus(profile, "accepted")}
+                  >
                     <Check className="h-5 w-5 text-[#4bb65b] group-hover:text-white" />
                   </Button>
                 </div>
 
-                <div className="flex gap-6 items-center">
-                  <div className="text-regular text-[#000000] font-Lato ml-16">Reject</div>
-                  <Button variant="outline" className="bg-[#ADADAD] hover:bg-gray-50 rounded-full w-12 h-12 p-0" size="sm" onClick={() => handleUpdateStatus(profile, "rejected")}>
+                {/* Reject */}
+                <div className="flex items-center justify-between w-full sm:justify-start sm:gap-4">
+                  <span className="text-sm font-Lato text-[#000000]">Reject</span>
+                  <Button
+                    variant="outline"
+                    className="bg-[#ADADAD] hover:bg-gray-50 rounded-full w-10 h-10 sm:w-12 sm:h-12 p-0"
+                    size="sm"
+                    onClick={() => handleUpdateStatus(profile, "rejected")}
+                  >
                     <X className="w-4 h-4 text-gray-600" />
                   </Button>
                 </div>
-
-
               </>
             )}
 
+            {/* ACCEPTED TAB */}
             {activeTab === "Accepted" && (
               <>
-                <div className="group flex gap-3 items-center border-2 border-[#8E2E37] rounded-full px-6 transition-colors hover:bg-[#8E2E37]">
-                  {/* placeholder */}
-                </div>
+                <div className="group flex items-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full justify-center"></div>
 
-                <div className="group flex gap-3 items-center border-2 border-[#8E2E37] rounded-full px-5 transition-colors hover:bg-[#8E2E37]">
+                <div className="group flex items-center justify-between sm:justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
                   <span className="text-black group-hover:text-white font-Lato">Chat</span>
-                  <Button size="sm" className="bg-transparent border-none p-0 hover:bg-transparent" onClick={() => handleChat(profile)}>
+                  <Button
+                    size="sm"
+                    className="bg-transparent border-none p-0 hover:bg-transparent"
+                    onClick={() => handleChat(profile)}
+                  >
                     <MessageCircleMore className="w-4 h-4 text-black group-hover:text-white" />
                   </Button>
                 </div>
 
-                <div className="group flex items-center border-2 border-[#8E2E37] rounded-full px-4 transition-colors hover:bg-[#8E2E37]">
+                <div className="group flex items-center justify-between sm:justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
                   <span className="text-black group-hover:text-white font-Lato">Reject</span>
-                  <Button size="sm" className="bg-transparent border-none p-0 hover:bg-transparent" onClick={() => handleUpdateStatus(profile, "rejected")}>
+                  <Button
+                    size="sm"
+                    className="bg-transparent border-none p-0"
+                    onClick={() => handleUpdateStatus(profile, "rejected")}
+                  >
                     <X className="w-4 h-4 text-black group-hover:text-white" />
                   </Button>
                 </div>
               </>
             )}
 
+            {/* SENT TAB */}
             {activeTab === "Sent" && (
               <>
-                <div className="group flex gap-3 items-center border-2 border-[#8E2E37] rounded-full px-6 transition-colors hover:bg-[#8E2E37]"></div>
-                <div className="group flex gap-3 items-center border-2 border-[#8E2E37] rounded-full px-2 transition-colors hover:bg-[#8E2E37]">
+                <div className="h-10 border-2 border-[#8E2E37] rounded-full w-full"></div>
+
+                <div className="group flex items-center justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
                   <span className="text-black group-hover:text-white font-Lato">Pending</span>
-                  <Button size="sm" className="bg-transparent border-none p-0 hover:bg-transparent">
-                    <ClockFading className="w-4 h-4 text-black group-hover:text-white" />
-                  </Button>
+                  <ClockFading className="w-4 h-4 ml-2 text-black group-hover:text-white" />
                 </div>
-                <div className="group flex items-center border-2 border-[#8E2E37] rounded-full px-4 transition-colors hover:bg-[#8E2E37]">
+
+                <div className="group flex items-center justify-between sm:justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
                   <span className="text-black group-hover:text-white font-Lato">Delete</span>
-                  <Button size="sm" className="bg-transparent border-none p-0 hover:bg-transparent" onClick={() => handleDelete(profile)}>
+                  <Button
+                    size="sm"
+                    className="bg-transparent border-none p-0"
+                    onClick={() => handleDelete(profile)}
+                  >
                     <Trash className="w-4 h-4 text-black group-hover:text-white" />
                   </Button>
                 </div>
               </>
             )}
 
+            {/* REJECTED TAB */}
             {activeTab === "Rejected" && (
-              <div className="flex flex-col items-center space-y-2">
-                <div className="text-gray-600 font-Lato">Profile Rejected</div>
-                <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white rounded-full px-4 py-2" onClick={() => handleRestore(profile)}>
+              <div className="flex flex-col items-center space-y-2 w-full">
+                <div className="text-gray-600 font-Lato text-sm">Profile Rejected</div>
+                <Button
+                  size="sm"
+                  className="bg-red-500 hover:bg-red-600 text-white rounded-full px-4 py-2"
+                  onClick={() => handleRestore(profile)}
+                >
                   Restore
                 </Button>
               </div>
             )}
 
-            {profile.status === "deleted" && <div className="text-sm font-Lato text-gray-500">Deleted</div>}
+            {profile.status === "deleted" &&
+              <div className="text-sm text-gray-500 font-Lato">Deleted</div>}
           </div>
         </div>
       </Card>
     );
   }
 
-return (
-  <div className="min-h-screen bg-gray-50">
+  /* ---------------------------------------------------------
+     🔥 COMPONENT FINAL RETURN (FULLY RESPONSIVE VERSION)
+  --------------------------------------------------------- */
 
-    {/* 🔥 FIXED TABS NAVBAR — EXACT MAIN NAVBAR KE NICHE */}
-    <div className="bg-white border-b sticky top-[72px] z-40">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="flex gap-10 overflow-x-auto items-center justify-evenly">
-          {tabs.map((tab) => (
-            <button
-              key={tab.name}
-              onClick={() => setActiveTab(tab.name as any)}
-              className={`py-4 px-2 whitespace-nowrap text-sm font-medium border-b-2 transition-colors font-Lato ${
-                activeTab === tab.name
-                  ? "border-red-500 text-red-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {tab.name}
-              {typeof tab.count === "number" ? `(${tab.count})` : ""}
-            </button>
-          ))}
+  return (
+    <div className="min-h-screen bg-gray-50">
+
+      {/* 🔥 FIXED TABS NAVBAR — RESPONSIVE UPDATED */}
+      <div className="bg-white border-b sticky top-[72px] z-40">
+        <div className="max-w-4xl mx-auto px-2 sm:px-4">
+
+          <div className="flex gap-6 sm:gap-10 overflow-x-auto no-scrollbar items-center justify-start sm:justify-evenly py-2">
+
+            {tabs.map((tab) => (
+              <button
+                key={tab.name}
+                onClick={() => setActiveTab(tab.name as any)}
+                className={`
+                  pb-3 px-2 whitespace-nowrap text-sm font-medium border-b-2 transition-colors font-Lato
+                  ${activeTab === tab.name
+                    ? "border-red-500 text-red-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                  }
+                `}
+              >
+                {tab.name}
+                {typeof tab.count === "number" ? ` (${tab.count})` : ""}
+              </button>
+            ))}
+
+          </div>
+
         </div>
       </div>
-    </div>
 
-    <div className="h-2"></div>
+      {/* SPACING */}
+      <div className="h-2"></div>
 
-    {activeTab === "Accepted" && (
-      <div className="flex gap-3 items-center justify-center mt-8"></div>
-    )}
-
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-      {loading ? (
-        <Loading message="Loading profiles..." />
-      ) : currentList.length === 0 ? (
-        <div className="text-center py-8">
-          <div className="text-gray-600">No profiles found</div>
-        </div>
-      ) : (
-        currentList.map((p, idx) => (
-          <ProfileCard
-            key={`${p.id}-${p.requestId || "noReq"}-${idx}`}
-            profile={p}
-          />
-        ))
+      {/* SMALL SPACING CONDITION — KEEP AS IS */}
+      {activeTab === "Accepted" && (
+        <div className="flex gap-3 items-center justify-center mt-4 sm:mt-8"></div>
       )}
+
+      {/* MAIN LIST CONTAINER */}
+      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-4">
+
+        {loading ? (
+          <Loading message="Loading profiles..." />
+
+        ) : currentList.length === 0 ? (
+
+          <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="text-gray-600 text-lg">No profiles found</div>
+          </div>
+
+        ) : (
+
+          currentList.map((p, idx) => (
+            <ProfileCard
+              key={`${p.id}-${p.requestId || "noReq"}-${idx}`}
+              profile={p}
+            />
+          ))
+
+        )}
+
+      </div>
+
     </div>
-
-  </div>
-);    
-
-}      
-
+  );
+}

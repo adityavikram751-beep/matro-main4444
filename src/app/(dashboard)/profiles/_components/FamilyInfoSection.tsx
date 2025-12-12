@@ -27,7 +27,7 @@ const defaultFamilyInfo = (): FamilyInfoItem[] => [
 ];
 
 // ===============================================
-// CUSTOM EDIT ICON (same everywhere)
+// CUSTOM EDIT ICON
 // ===============================================
 const EditIconRounded = (props: any) => (
   <svg
@@ -143,8 +143,7 @@ const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
             10
           ),
           familyBasedOutOf:
-            editValues.find((i) => i.label === "Family Based Out of")?.value ||
-            "",
+            editValues.find((i) => i.label === "Family Based Out of")?.value || "",
         },
       };
 
@@ -172,24 +171,25 @@ const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
   // -------------------- UI STATES --------------------
   if (loading)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-gray-600">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-center text-gray-600">
         Loading...
       </div>
     );
 
   if (error)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-red-600">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-center text-red-600">
         {error}
       </div>
     );
 
   // -------------------- MAIN UI --------------------
   return (
-    <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm">
+    <div className="bg-[#FFF8F0] p-4 sm:p-6 rounded-2xl shadow-sm">
+
       {updateStatus && (
         <div
-          className={`mb-4 p-2 rounded ${
+          className={`mb-4 p-2 rounded text-center ${
             updateStatus.includes("success")
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
@@ -200,33 +200,48 @@ const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
       )}
 
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Family</h3>
 
-        {/* UPDATED ICON */}
         <div onClick={handleEdit}>
           <EditIconRounded />
         </div>
       </div>
 
-      {/* TWO-COLUMN VIEW */}
-      <div className="grid grid-cols-2 divide-x divide-dashed divide-gray-300">
-        <div className="space-y-3 pr-6">
+      {/* RESPONSIVE TWO COLUMN */}
+      <div
+        className="
+          grid 
+          grid-cols-1 
+          sm:grid-cols-2 
+          sm:divide-x 
+          divide-dashed 
+          divide-gray-300
+          gap-4
+        "
+      >
+        <div className="space-y-3 sm:pr-6">
           {info.slice(0, Math.ceil(info.length / 2)).map((item, i) => (
-            <div key={i} className="flex justify-between text-sm">
-              <span className="text-gray-600 w-1/2">{item.label}</span>
-              <span className="text-gray-900 font-medium w-1/2">
+            <div
+              key={i}
+              className="flex flex-col sm:flex-row justify-between text-sm"
+            >
+              <span className="text-gray-600 sm:w-1/2 w-full">{item.label}</span>
+              <span className="text-gray-900 font-medium sm:w-1/2 w-full">
                 : {item.value || "Not specified"}
               </span>
             </div>
           ))}
         </div>
 
-        <div className="space-y-3 pl-6">
+        <div className="space-y-3 sm:pl-6">
           {info.slice(Math.ceil(info.length / 2)).map((item, i) => (
-            <div key={i} className="flex justify-between text-sm">
-              <span className="text-gray-600 w-1/2">{item.label}</span>
-              <span className="text-gray-900 font-medium w-1/2">
+            <div
+              key={i}
+              className="flex flex-col sm:flex-row justify-between text-sm"
+            >
+              <span className="text-gray-600 sm:w-1/2 w-full">{item.label}</span>
+              <span className="text-gray-900 font-medium sm:w-1/2 w-full">
                 : {item.value || "Not specified"}
               </span>
             </div>
@@ -252,8 +267,13 @@ const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
                 <Label className="text-sm text-gray-700 mb-1 block">
                   {item.label}
                 </Label>
+
                 <input
-                  className="w-full p-2 border border-gray-300 rounded-md bg-white text-gray-700 shadow-sm focus:ring-2 focus:ring-rose-700"
+                  className="
+                    w-full p-2 border border-gray-300 rounded-md 
+                    bg-white text-gray-700 shadow-sm 
+                    focus:outline-none focus:ring-2 focus:ring-rose-700
+                  "
                   value={item.value}
                   onChange={(e) => handleInputChange(i, e.target.value)}
                 />
@@ -261,17 +281,19 @@ const FamilyInfoSection: React.FC<FamilyInfoSectionProps> = ({
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
+          {/* Responsive Buttons */}
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              className="bg-gray-100 text-gray-700"
+              className="bg-gray-100 text-gray-700 w-full sm:w-auto"
               onClick={() => setModalOpen(false)}
             >
               Cancel
             </Button>
+
             <Button
-              className="bg-rose-700 hover:bg-rose-800 text-white"
+              className="bg-rose-700 hover:bg-rose-800 text-white w-full sm:w-auto"
               type="submit"
             >
               Save

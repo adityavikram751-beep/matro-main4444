@@ -32,8 +32,6 @@ const Hero: React.FC = () => {
   const [motherTongue, setMotherTongue] = useState('English');
   const [showPreferenceForm, setShowPreferenceForm] = useState(false);
 
- 
-
   const handleDetailedPreferences = () => {
     setShowPreferenceForm(true);
   };
@@ -74,189 +72,200 @@ const Hero: React.FC = () => {
 
   return (
     <>
+      {/* HERO SECTION GRID */}
       <div className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2">
-        <div className="flex items-center justify-center">
-          <div className="w-full flex flex-col justify-center pl-16 pr-8 py-24 mb-40">
-            <h1 className="text-5xl font-medium text-[#343434] leading-tight font-Lato">
-              A Pure Path to Marriage — <br />
+
+        {/* LEFT TEXT SIDE */}
+        <div className="flex items-center justify-center px-6 lg:px-16 py-16 lg:py-24">
+          <div className="w-full lg:w-[90%]">
+            <h1 className="text-4xl lg:text-5xl font-medium text-[#343434] leading-tight font-Lato text-center lg:text-left">
+              A Pure Path to Marriage — <br className="hidden lg:flex" />
               With Love and Trust at Heart
             </h1>
-            <p className="text-1xl font-light text-[#757575] mt-6 font-Lato">
-              This is more than just a matrimonial app. It's a heartfelt journey toward companionship, built on honesty, care, and community — without pressure or payment.
+
+            <p className="text-base lg:text-xl font-light text-[#757575] mt-6 font-Lato text-center lg:text-left">
+              This is more than just a matrimonial app. It's a heartfelt journey toward companionship,
+              built on honesty, care, and community — without pressure or payment.
             </p>
           </div>
         </div>
-        <div className="relative flex items-center justify-end">
+
+        {/* RIGHT IMAGE SIDE */}
+        <div className="relative w-full h-[300px] lg:h-auto">
           <Image
             src="/assets/heroimage.png"
             alt="hero"
-            layout="fill"
-            objectFit="cover"
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
             priority
           />
         </div>
-        
-        {/* Mobile Search Form */}
-        <div className="block lg:hidden w-full px-8 mt-6">
-          <div className="flex flex-col gap-4 bg-white p-4 shadow-xl border border-gray-200 rounded-md">
+
+        {/* MOBILE FORM */}
+        <div className="block lg:hidden w-full px-6 mt-6">
+          <div className="flex flex-col gap-4 bg-white p-5 shadow-xl border border-gray-200 rounded-md">
+
+            {/* Looking For */}
             <div className="flex flex-col">
-              <label className="text-sm mb-1 font-medium text-[#757575] font-sans">I'm looking for a</label>
-              <select 
+              <label className="text-sm mb-1 font-medium text-[#757575]">I'm looking for a</label>
+              <select
                 value={lookingFor}
                 onChange={(e) => setLookingFor(e.target.value)}
-                className="border-[#6F0000] border p-2 text-md font-medium rounded w-full font-Mulish"
+                className="border-[#6F0000] border p-2 text-md rounded font-Mulish"
               >
                 <option>Women</option>
                 <option>Men</option>
               </select>
             </div>
-            <div className="flex gap-2 items-end">
+
+            {/* AGE RANGE */}
+            <div className="flex gap-3 items-end">
               <div className="flex flex-col">
-                <label className="text-sm mb-1 font-medium text-[#757575] font-sans">Age</label>
-                <input 
-                  type="number" 
-                  min="18" 
-                  max="99" 
+                <label className="text-sm font-medium text-[#757575]">Age</label>
+                <input
+                  type="number"
                   value={ageFrom}
                   onChange={(e) => setAgeFrom(Number(e.target.value))}
-                  className="border border-[#6F0000] p-2 text-md font-medium rounded w-20 font-Mulish" 
+                  className="border border-[#6F0000] p-2 rounded w-20 font-Mulish"
                 />
               </div>
-              <div className="pb-2 text-md font-medium font-Mulish">to</div>
+
+              <span className="pb-2 font-medium">to</span>
+
               <div className="flex flex-col">
-                <label className="invisible font-medium">Age</label>
-                <input 
-                  type="number" 
-                  min="18" 
-                  max="99" 
+                <label className="invisible">Age</label>
+                <input
+                  type="number"
                   value={ageTo}
                   onChange={(e) => setAgeTo(Number(e.target.value))}
-                  className="border border-[#6F0000] p-2 text-md font-medium rounded w-20 font-Mulish" 
+                  className="border border-[#6F0000] p-2 rounded w-20 font-Mulish"
                 />
               </div>
             </div>
+
+            {/* RELIGION */}
             <div className="flex flex-col">
-              <label className="text-sm mb-1 font-medium text-[#757575] font-sans">Of Religion</label>
-              <select 
+              <label className="text-sm mb-1 font-medium text-[#757575]">Of Religion</label>
+              <select
                 value={religion}
                 onChange={(e) => setReligion(e.target.value)}
-                className="border-[#6F0000] border p-2 text-md font-medium rounded w-full font-Mulish"
+                className="border-[#6F0000] border p-2 rounded font-Mulish"
               >
                 <option>Hindu</option>
                 <option>Muslim</option>
                 <option>Christian</option>
               </select>
             </div>
+
+            {/* MOTHER TONGUE */}
             <div className="flex flex-col">
-              <label className="text-sm mb-1 font-medium text-[#757575] font-sans">And Mother Tongue</label>
-              <select 
+              <label className="text-sm mb-1 font-medium text-[#757575]">And Mother Tongue</label>
+              <select
                 value={motherTongue}
                 onChange={(e) => setMotherTongue(e.target.value)}
-                className="border-[#6F0000] border p-2 text-md font-medium rounded w-full font-Mulish"
+                className="border-[#6F0000] border p-2 rounded font-Mulish"
               >
                 <option>English</option>
                 <option>Hindi</option>
               </select>
             </div>
-            
-            {/* Button Group */}
-            <div className="flex flex-col gap-2">
-            
-              <button
-                type="button"
-                className="bg-white text-[#7D0A0A] border-2 border-[#7D0A0A] w-full py-3 rounded text-md font-semibold font-Mulish shadow-md hover:bg-[#7D0A0A] hover:text-white transition-colors duration-200"
-                onClick={handleDetailedPreferences}
-              >
-                Set Detailed Preferences
-              </button>
-            </div>
+
+            {/* BUTTON */}
+            <button
+              type="button"
+              onClick={handleDetailedPreferences}
+              className="bg-white text-[#7D0A0A] border-2 border-[#7D0A0A] w-full py-3 rounded text-md font-semibold font-Mulish shadow hover:bg-[#7D0A0A] hover:text-white transition"
+            >
+              Set Detailed Preferences
+            </button>
+
           </div>
         </div>
-        
-        {/* Desktop Search Form */}
-        <div className="hidden lg:flex absolute left-1/2 transform -translate-x-1/2 top-[440px] z-20 w-full max-w-5xl">
-          <div className="flex flex-col items-center justify-center gap-4 bg-white px-6 py-5 shadow-2xl border border-gray-200 w-full">
-            {/* Main Search Row */}
-            <div className="flex items-center justify-evenly gap-6 w-full">
+
+        {/* DESKTOP FORM */}
+        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 top-[460px] z-20 w-full max-w-5xl px-4">
+          <div className="flex flex-col bg-white px-8 py-6 shadow-2xl border border-gray-200 w-full rounded-md">
+
+            <div className="flex items-center justify-between gap-6 w-full flex-wrap">
+
+              {/* Looking For */}
               <div className="flex flex-col">
-                <label className="text-sm mb-1 font-medium text-[#1C1C1C] font-sans">I'm looking for a</label>
-                <select 
+                <label className="text-sm mb-1 font-medium">I'm looking for a</label>
+                <select
                   value={lookingFor}
                   onChange={(e) => setLookingFor(e.target.value)}
-                  className="border-[#6F0000] border p-2 text-md font-medium rounded min-w-[120px] font-Mulish"
+                  className="border-[#6F0000] border p-2 rounded min-w-[130px]"
                 >
                   <option>Women</option>
                   <option>Men</option>
                 </select>
               </div>
-              <div className="flex items-end gap-2 text-md font-medium font-Mulish">
+
+              {/* AGE */}
+              <div className="flex items-end gap-2">
                 <div className="flex flex-col">
-                  <label className="text-sm mb-1 font-medium text-[#1C1C1C] font-sans">Age</label>
-                  <input 
-                    type="number" 
-                    min="18" 
-                    max="99" 
+                  <label className="text-sm mb-1 font-medium">Age</label>
+                  <input
+                    type="number"
                     value={ageFrom}
                     onChange={(e) => setAgeFrom(Number(e.target.value))}
-                    className="border border-[#6F0000] p-2 text-md font-medium rounded w-16 font-Mulish" 
+                    className="border border-[#6F0000] p-2 rounded w-16"
                   />
                 </div>
-                <div className="pb-2">to</div>
+                <span className="pb-2">to</span>
                 <div className="flex flex-col">
-                  <label className="invisible font-medium">Age</label>
-                  <input 
-                    type="number" 
-                    min="18" 
-                    max="99" 
+                  <label className="invisible">Age</label>
+                  <input
+                    type="number"
                     value={ageTo}
                     onChange={(e) => setAgeTo(Number(e.target.value))}
-                    className="border border-[#6F0000] p-2 text-md font-medium rounded w-16 font-Mulish" 
+                    className="border border-[#6F0000] p-2 rounded w-16"
                   />
                 </div>
               </div>
+
+              {/* Religion */}
               <div className="flex flex-col">
-                <label className="text-sm mb-1 font-medium text-[#1C1C1C] font-sans">Of Religion</label>
-                <select 
+                <label className="text-sm mb-1 font-medium">Of Religion</label>
+                <select
                   value={religion}
                   onChange={(e) => setReligion(e.target.value)}
-                  className="border-[#6F0000] border p-2 text-md font-medium rounded min-w-[120px] font-Mulish"
+                  className="border-[#6F0000] border p-2 rounded min-w-[130px]"
                 >
                   <option>Hindu</option>
                   <option>Muslim</option>
                   <option>Christian</option>
                 </select>
               </div>
+
+              {/* Mother Tongue */}
               <div className="flex flex-col">
-                <label className="text-sm mb-1 font-medium text-[#1C1C1C] font-sans">And Mother Tongue</label>
-                <select 
+                <label className="text-sm mb-1 font-medium">Mother Tongue</label>
+                <select
                   value={motherTongue}
                   onChange={(e) => setMotherTongue(e.target.value)}
-                  className="border-[#6F0000] border p-2 text-md font-medium rounded min-w-[120px] font-Mulish"
+                  className="border-[#6F0000] border p-2 rounded min-w-[130px]"
                 >
                   <option>English</option>
                   <option>Hindi</option>
                 </select>
               </div>
-              <div className="mt-4">
-             
+
+              {/* BUTTON */}
               <button
-                type="button"
-                className="bg-[#7D0A0A] text-white border-2 border-[#7B0A0A] px-8 py-3 rounded text-md font-semibold font-Mulish shadow-md hover:bg-[#7D0A0A] hover:text-white transition-colors duration-200"
                 onClick={handleDetailedPreferences}
+                className="bg-[#7D0A0A] text-white border-2 border-[#7B0A0A] px-10 py-3 rounded shadow-md hover:bg-[#6A0808] transition"
               >
-                Set  Preferences
+                Set Preferences
               </button>
+
             </div>
-            </div>
-            
-            {/* Button Row */}
-            
           </div>
         </div>
+
       </div>
 
-      {/* Preference Form Modal */}
+      {/* PREFERENCE FORM POPUP */}
       {showPreferenceForm && (
         <ProfilePreferenceForm
           onSubmit={handlePreferenceSubmit}

@@ -236,57 +236,76 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
 
   /* ---------------- MAIN UI ---------------- */
   if (loading)
-    return <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm">Loading...</div>;
+    return <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-center">Loading...</div>;
 
   if (error)
-    return <div className="bg-[#FFF8F0] p-6 rounded-2xl text-red-500 shadow-sm">{error}</div>;
+    return (
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl text-red-500 shadow-sm text-center">
+        {error}
+      </div>
+    );
 
   return (
-    <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm">
+    <div className="bg-[#FFF8F0] rounded-2xl p-4 sm:p-6 shadow-sm">
+
       {updateStatus && (
-        <div className="mb-4 p-2 rounded bg-green-100 text-green-700">{updateStatus}</div>
+        <div className="mb-4 p-2 rounded bg-green-100 text-green-700 text-center">
+          {updateStatus}
+        </div>
       )}
 
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Lifestyle & Hobbies</h3>
-
-        {/* UPDATED CUSTOM ICON */}
         <EditIconRounded onClick={() => { setEditValues(cloneSections(info)); setModalOpen(true); }} />
       </div>
 
-      {/* TWO COLUMN PREVIEW */}
-      <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-dashed divide-gray-300">
-        <div className="pr-6 space-y-4">
+      {/* TWO COLUMN PREVIEW — RESPONSIVE */}
+      <div className="
+        grid 
+        grid-cols-1 
+        md:grid-cols-2 
+        gap-6
+        md:divide-x 
+        divide-dashed 
+        divide-gray-300
+      ">
+        <div className="md:pr-6 space-y-4">
           {info.slice(0, Math.ceil(info.length / 2)).map((section, idx) => (
             <div key={idx}>
               <div className="text-sm font-semibold text-gray-900 mb-1">
                 {section.label}
               </div>
+
               {section.items.map((item, i) => (
-                <div key={i} className="flex justify-between text-sm text-gray-700 mb-1">
-                  <span className="w-1/2 text-gray-600">
+                <div key={i} className="flex flex-col sm:flex-row justify-between text-sm text-gray-700 mb-1">
+                  <span className="w-full sm:w-1/2 text-gray-600">
                     {section.subLabels ? section.subLabels[i] : section.label}
                   </span>
-                  <span className="w-1/2 text-right font-medium">{item || 'Not specified'}</span>
+                  <span className="w-full sm:w-1/2 sm:text-right font-medium">
+                    {item || 'Not specified'}
+                  </span>
                 </div>
               ))}
             </div>
           ))}
         </div>
 
-        <div className="pl-6 space-y-4">
+        <div className="md:pl-6 space-y-4">
           {info.slice(Math.ceil(info.length / 2)).map((section, idx) => (
             <div key={idx}>
               <div className="text-sm font-semibold text-gray-900 mb-1">
                 {section.label}
               </div>
+
               {section.items.map((item, i) => (
-                <div key={i} className="flex justify-between text-sm text-gray-700 mb-1">
-                  <span className="w-1/2 text-gray-600">
+                <div key={i} className="flex flex-col sm:flex-row justify-between text-sm text-gray-700 mb-1">
+                  <span className="w-full sm:w-1/2 text-gray-600">
                     {section.subLabels ? section.subLabels[i] : section.label}
                   </span>
-                  <span className="w-1/2 text-right font-medium">{item || 'Not specified'}</span>
+                  <span className="w-full sm:w-1/2 sm:text-right font-medium">
+                    {item || 'Not specified'}
+                  </span>
                 </div>
               ))}
             </div>
@@ -306,10 +325,11 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
             handleSave();
           }}
         >
-          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-6 mb-4">
+          {/* scrollable & responsive modal content */}
+          <div className="max-h-[60vh] overflow-y-auto pr-1 sm:pr-2 space-y-6 mb-4">
             {editValues.map((section, secIdx) => (
               <div key={secIdx} className="pb-3 border-b last:border-b-0">
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-2">
                   <Label className="text-sm font-medium">{section.label}</Label>
 
                   {[
@@ -327,7 +347,7 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-xs"
+                      className="text-xs w-full sm:w-auto"
                       onClick={() => {
                         const upd = cloneSections(editValues);
                         upd[secIdx].items.push('');
@@ -340,7 +360,7 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
                 </div>
 
                 {section.items.map((item, itemIdx) => (
-                  <div key={itemIdx} className="mb-2 flex gap-2 items-center">
+                  <div key={itemIdx} className="mb-2 flex gap-2 items-start">
                     <div className="flex-1">
                       {section.subLabels?.[itemIdx] && (
                         <Label className="text-xs text-gray-600 block mb-1">
@@ -348,7 +368,11 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
                         </Label>
                       )}
                       <input
-                        className="w-full rounded-md border border-gray-300 p-2 text-xs focus:ring-2 focus:ring-rose-700"
+                        className="
+                          w-full rounded-md border border-gray-300 p-2 
+                          text-xs bg-white text-gray-700 
+                          focus:ring-2 focus:ring-rose-700
+                        "
                         value={item}
                         onChange={(e) => {
                           const upd = cloneSections(editValues);
@@ -359,6 +383,7 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
                       />
                     </div>
 
+                    {/* remove button only for list-type sections */}
                     {[
                       'Movies',
                       'Food I Cook',
@@ -374,6 +399,7 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
                         type="button"
                         variant="destructive"
                         size="sm"
+                        className="w-auto"
                         onClick={() => {
                           const upd = cloneSections(editValues);
                           upd[secIdx].items.splice(itemIdx, 1);
@@ -390,16 +416,22 @@ const LifestyleInfoSection: React.FC<LifestyleInfoSectionProps> = ({ lifestyleIn
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
+          {/* responsive modal footer */}
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setModalOpen(false)}
-              className="bg-gray-100"
+              className="bg-gray-100 w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button className="bg-rose-700 text-white hover:bg-rose-800">Save</Button>
+
+            <Button
+              className="bg-rose-700 text-white hover:bg-rose-800 w-full sm:w-auto"
+            >
+              Save
+            </Button>
           </div>
         </form>
       </Modal>

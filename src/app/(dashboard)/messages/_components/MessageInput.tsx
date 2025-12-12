@@ -90,12 +90,12 @@ export default function MessageInput({
     e.target.value = "";
   };
 
-  /* Remove one file */
+  /* Remove single file */
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  /* Drag + Drop handlers */
+  /* Drag/drop */
   const handleDragOver = (e: any) => {
     e.preventDefault();
     setIsDragging(true);
@@ -124,25 +124,31 @@ export default function MessageInput({
 
   return (
     <div
-      className={`p-4 border-t bg-white ${isDragging ? "bg-indigo-50 border-indigo-500" : ""}`}
+      className={`
+        p-3 sm:p-4 border-t bg-white
+        ${isDragging ? "bg-indigo-50 border-indigo-500" : ""}
+        transition-all
+      `}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Selected files preview */}
+      {/* FILE PREVIEW — RESPONSIVE WRAP */}
       {selectedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex flex-wrap gap-2 mb-2 max-h-24 overflow-y-auto pr-1">
           {selectedFiles.map((file, i) => (
             <div
               key={i}
-              className="flex items-center bg-gray-100 border px-2 py-1 rounded-lg"
+              className="flex items-center gap-1 bg-gray-100 border px-2 py-1 rounded-lg max-w-[150px] sm:max-w-[200px]"
             >
               {file.type.startsWith("image/") ? (
-                <ImageIcon className="w-4 h-4 mr-1 text-gray-600" />
+                <ImageIcon className="w-4 h-4 text-gray-600" />
               ) : (
-                <FileText className="w-4 h-4 mr-1 text-gray-600" />
+                <FileText className="w-4 h-4 text-gray-600" />
               )}
-              <span className="text-xs truncate max-w-[120px]">{file.name}</span>
+
+              <span className="text-xs truncate">{file.name}</span>
+
               <button type="button" onClick={() => removeFile(i)}>
                 <X size={14} />
               </button>
@@ -151,26 +157,38 @@ export default function MessageInput({
         </div>
       )}
 
-      {/* Replying preview (Instagram-style small bar) */}
+      {/* REPLY PREVIEW — MOBILE RESPONSIVE */}
       {replyingMessage && (
-        <div className="flex items-center justify-between bg-indigo-50 border-l-4 border-indigo-600 px-3 py-2 rounded mb-2">
-          <div className="truncate max-w-[75%] text-indigo-700 text-sm">
+        <div className="
+          flex items-center justify-between 
+          bg-indigo-50 border-l-4 border-indigo-600 
+          px-3 py-2 rounded mb-2
+        ">
+          <div className="truncate max-w-[70%] text-indigo-700 text-sm">
             Replying to: <span className="font-semibold">{replyingMessage.text}</span>
           </div>
-          <button onClick={onCancelReply} className="text-indigo-600 font-bold">
+
+          <button
+            onClick={onCancelReply}
+            className="text-indigo-600 text-lg font-bold"
+          >
             ✕
           </button>
         </div>
       )}
 
-      {/* Input form */}
-      <form onSubmit={handleSubmit} className="flex items-end gap-3">
-        {/* Upload button */}
+      {/* INPUT ROW */}
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3">
+
+        {/* FILE BUTTON */}
         <button
           type="button"
           disabled={disabled}
           onClick={() => fileInputRef.current?.click()}
-          className="p-3 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-60"
+          className="
+            p-2 sm:p-3 rounded-lg bg-gray-100 hover:bg-gray-200 
+            disabled:opacity-60 transition
+          "
         >
           <Paperclip className="w-5 h-5 text-gray-600" />
         </button>
@@ -183,37 +201,47 @@ export default function MessageInput({
           onChange={handleFileChange}
         />
 
-        {/* Textarea */}
+        {/* TEXTAREA (FULLY RESPONSIVE) */}
         <textarea
           ref={textareaRef}
           value={message}
           disabled={disabled}
-          placeholder={disabled ? "You cannot send messages" : "Type your message..."}
+          placeholder={disabled ? "You cannot send messages" : "Type a message..."}
           onChange={(e) => {
             setMessage(e.target.value);
             emitTyping();
           }}
           onKeyPress={handleKeyPress}
           rows={1}
-          className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 
-                     focus:outline-none focus:ring-2 focus:ring-indigo-500
-                     disabled:opacity-50 overflow-hidden"
-          style={{ minHeight: "44px", maxHeight: "180px" }}
+          className="
+            flex-1 resize-none border border-gray-300 
+            rounded-lg px-3 py-2 sm:px-4 sm:py-3 
+            text-sm sm:text-base bg-white
+            focus:outline-none focus:ring-2 focus:ring-indigo-500
+            disabled:opacity-50 overflow-hidden
+            max-h-[160px]
+          "
+          style={{ minHeight: "42px" }}
         />
 
-        {/* Send button */}
+        {/* SEND BUTTON */}
         <button
           type="submit"
           disabled={disabled || (!message.trim() && selectedFiles.length === 0)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg 
-                     disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
+          className="
+            bg-indigo-600 hover:bg-indigo-700 text-white
+            p-2 sm:p-3 rounded-lg disabled:opacity-50 
+            transition-all shadow-md hover:shadow-lg
+          "
         >
           <Send className="w-5 h-5" />
         </button>
       </form>
 
       {isDragging && (
-        <p className="text-sm text-indigo-600 mt-2">Drop files to upload</p>
+        <p className="text-xs sm:text-sm text-indigo-600 mt-2">
+          Drop files to upload
+        </p>
       )}
     </div>
   );

@@ -13,18 +13,26 @@ const Modal: React.FC<ModalProps> = ({ open, onClose, children }) => {
     <div
       className="
         fixed inset-0 z-50 flex items-center justify-center
-        bg-white/10 backdrop-blur-[2px]   /* ⭐ VERY LIGHT BLUR */
+        bg-white/10 backdrop-blur-[2px]
       "
       onClick={onClose}
     >
       <div
         className="
-          custom-scrollbar bg-white shadow-lg rounded-lg 
-          px-4 py-4 min-w-[450px] max-h-[90vh] overflow-y-auto relative
+          custom-scrollbar bg-white shadow-lg rounded-lg
+          px-4 py-4 
+          
+          /* ⭐ RESPONSIVE WIDTH */
+          w-[90%]                 /* Mobile - 90% width */
+          sm:min-w-[450px]        /* Small screens and above */
+          max-w-lg                /* Max width cap for bigger devices */
+          md:max-w-xl
+          
+          max-h-[90vh] overflow-y-auto relative
           animate-[fadeIn_0.15s_ease-out]
-          border border-gray-300          /* ⭐ BORDER ON ALL SIDES */
+          border border-gray-300
         "
-        onClick={(e) => e.stopPropagation()}  /* Prevent closing when clicking inside */
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button

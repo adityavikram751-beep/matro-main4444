@@ -12,7 +12,8 @@ interface BasicInfoSectionProps {
 }
 
 const API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/self";
-const UPDATE_API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
+const UPDATE_API_URL =
+  "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
 
 // helper
 function getToken() {
@@ -21,7 +22,7 @@ function getToken() {
 }
 
 // ===============================================
-// CUSTOM EDIT ICON (same as your screenshot)
+// CUSTOM EDIT ICON
 // ===============================================
 const EditIconRounded = (props: any) => (
   <svg
@@ -84,7 +85,10 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
           { label: "Marital Status", value: b.maritalStatus || "" },
           { label: "Height", value: b.height || "" },
           { label: "Any Disability", value: b.anyDisability || "None" },
-          { label: "Health Information", value: b.healthInformation || "Not Specified" },
+          {
+            label: "Health Information",
+            value: b.healthInformation || "Not Specified",
+          },
           { label: "Weight", value: b.weight?.toString() || "" },
           { label: "Complexion", value: b.complexion || "" },
         ];
@@ -128,7 +132,8 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
       const parts = nameField.trim().split(/\s+/);
       const firstName = parts[0] || "";
       const lastName = parts.length > 1 ? parts[parts.length - 1] : "";
-      const middleName = parts.length > 2 ? parts.slice(1, -1).join(" ") : "None";
+      const middleName =
+        parts.length > 2 ? parts.slice(1, -1).join(" ") : "None";
 
       const updatedPayload = {
         basicInfo: {
@@ -145,7 +150,8 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
             editValues.find((i) => i.label === "Marital Status")?.value || "",
           height: editValues.find((i) => i.label === "Height")?.value || "",
           anyDisability:
-            editValues.find((i) => i.label === "Any Disability")?.value || "None",
+            editValues.find((i) => i.label === "Any Disability")?.value ||
+            "None",
           healthInformation:
             editValues.find((i) => i.label === "Health Information")?.value ||
             "Not Specified",
@@ -184,23 +190,24 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
 
   if (loading)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-gray-600">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-gray-600 text-center">
         Loading...
       </div>
     );
 
   if (error)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-red-600">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-red-600 text-center">
         {error}
       </div>
     );
 
   return (
-    <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm">
+    <div className="bg-[#FFF8F0] p-4 sm:p-6 rounded-2xl shadow-sm">
+
       {updateStatus && (
         <div
-          className={`mb-4 p-2 rounded ${
+          className={`mb-4 p-2 rounded text-center ${
             updateStatus.includes("success")
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
@@ -211,18 +218,27 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Basic Info</h3>
 
-        {/* UPDATED CUSTOM ICON */}
         <div onClick={openEditor}>
           <EditIconRounded />
         </div>
       </div>
 
-      {/* Two-column data */}
-      <div className="grid grid-cols-2 divide-x divide-dashed divide-gray-300">
-        <div className="space-y-3 pr-6">
+      {/* Responsive GRID */}
+      <div className="
+        grid 
+        grid-cols-1 
+        sm:grid-cols-2 
+        gap-4 
+        sm:gap-6 
+        sm:divide-x 
+        divide-dashed 
+        divide-gray-300
+      ">
+        {/* LEFT COLUMN */}
+        <div className="space-y-3 sm:pr-6">
           {info.slice(0, Math.ceil(info.length / 2)).map((item, idx) => (
             <div key={idx} className="flex justify-between text-sm">
               <span className="w-1/2 text-gray-600">{item.label}</span>
@@ -233,7 +249,8 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
           ))}
         </div>
 
-        <div className="space-y-3 pl-6">
+        {/* RIGHT COLUMN */}
+        <div className="space-y-3 sm:pl-6">
           {info.slice(Math.ceil(info.length / 2)).map((item, idx) => (
             <div key={idx} className="flex justify-between text-sm">
               <span className="w-1/2 text-gray-600">{item.label}</span>
@@ -245,7 +262,7 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
         </div>
       </div>
 
-      {/* Modal */}
+      {/* MODAL */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
         <div className="mb-4 text-center">
           <h2 className="text-xl font-Lato text-gray-900">Edit Basic Info</h2>
@@ -263,8 +280,21 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
                 <Label className="text-sm text-gray-700 mb-1 block">
                   {item.label}
                 </Label>
+
                 <input
-                  className="w-full rounded-md border border-gray-300 p-2 text-sm bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-rose-700"
+                  className="
+                    w-full 
+                    rounded-md 
+                    border 
+                    border-gray-300 
+                    p-2 
+                    text-sm 
+                    bg-white 
+                    text-gray-800 
+                    focus:outline-none 
+                    focus:ring-2 
+                    focus:ring-rose-700
+                  "
                   value={item.value}
                   onChange={(e) => handleInputChange(idx, e.target.value)}
                 />
@@ -272,16 +302,17 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setModalOpen(false)}
-              className="bg-gray-100 text-gray-700"
+              className="bg-gray-100 text-gray-700 w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button className="bg-rose-700 hover:bg-rose-800 text-white">
+
+            <Button className="bg-rose-700 hover:bg-rose-800 text-white w-full sm:w-auto">
               Save
             </Button>
           </div>

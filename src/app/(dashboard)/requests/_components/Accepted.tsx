@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import {  X, MessageCircleMore } from "lucide-react"
+import { X, MessageCircleMore } from "lucide-react"
 import Image from "next/image"
 
 interface Profile {
@@ -73,7 +73,6 @@ export default function Accepted() {
     "Accepted by her" | "Accepted by me" | "All"
   >("All")
 
-  // Filter profiles based on activeSubTab and activeTab
   const filteredProfiles = profiles.filter((p) => {
     if (activeTab !== "Accepted") return false
     if (activeSubTab === "All") return true
@@ -105,7 +104,7 @@ export default function Accepted() {
         </div>
       </div>
 
-      {/* Sub Tabs (only show if 'Accepted' tab active) */}
+      {/* Sub Tabs */}
       {activeTab === "Accepted" && (
         <div className="flex flex-wrap gap-3 items-center justify-center mt-6 px-4">
           {["Accepted by her", "Accepted by me", "All"].map((tab) => (
@@ -122,22 +121,23 @@ export default function Accepted() {
         </div>
       )}
 
-      {/* Profiles List */}
+      {/* Profiles */}
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
         {filteredProfiles.length === 0 && (
           <p className="text-center text-gray-500">No profiles found.</p>
         )}
+
         {filteredProfiles.map((profile) => (
           <Card
             key={profile.id}
             className="p-4 sm:p-6 bg-white rounded-lg border border-[#7D0A0A]"
           >
-            <div className="flex flex-col lg:flex-row items-start lg:items-stretch gap-4 lg:gap-6">
-              {/* Image */}
-              <div className="flex-shrink-0 self-center lg:self-auto">
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 border border-gray-300">
+            <div className="flex flex-col lg:flex-row w-full gap-6">
+              {/* IMAGE */}
+              <div className="flex justify-center lg:block w-full lg:w-auto">
+                <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300">
                   <Image
-                    src={profile.image || "/placeholder.svg"}
+                    src={profile.image}
                     alt={profile.name}
                     width={96}
                     height={96}
@@ -146,7 +146,7 @@ export default function Accepted() {
                 </div>
               </div>
 
-              {/* Profile Info */}
+              {/* INFO (takes full width on mobile) */}
               <div className="flex-1 min-w-0">
                 <div className="border-b border-[#757575] mb-2 font-Lato">
                   <h3 className="text-lg font-semibold text-[#1E1E1E] mb-1">
@@ -156,13 +156,13 @@ export default function Accepted() {
                     {profile.profileId} | {profile.lastSeen}
                   </p>
                 </div>
+
                 <div className="space-y-1 text-sm font-Lato text-[#1E1E1E]">
                   <p>
-                    <span>{profile.age} Yrs</span> . {profile.height} .{" "}
-                    {profile.caste}
+                    {profile.age} Yrs · {profile.height} · {profile.caste}
                   </p>
                   <p>
-                    {profile.profession} . {profile.salary}
+                    {profile.profession} · {profile.salary}
                   </p>
                   <p>{profile.education}</p>
                   <p>{profile.location}</p>
@@ -170,41 +170,40 @@ export default function Accepted() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex lg:flex-col gap-2 w-full lg:w-[240px] border-t lg:border-t-0 lg:border-l border-[#757575] pt-4 lg:pt-0 lg:pl-6 justify-between">
-                {/* Call */}
-                <div className="group flex justify-between items-center border-2 border-[#8E2E37] rounded-full px-4 py-2 hover:bg-[#8E2E37] transition-colors cursor-pointer">
+              {/* ACTION BUTTONS — NOW RESPONSIVE */}
+              <div className="
+                flex flex-row lg:flex-col 
+                w-full lg:w-[220px] 
+                gap-3 
+                border-t lg:border-t-0 lg:border-l 
+                border-[#757575] 
+                pt-4 lg:pt-0 lg:pl-6 
+                justify-between
+              ">
+                {/* CALL */}
+                <div className="group flex justify-between items-center border-2 border-[#8E2E37] rounded-full px-4 py-2 hover:bg-[#8E2E37] transition-colors cursor-pointer w-full">
                   <span className="text-sm font-Lato text-black group-hover:text-white">
                     Call
                   </span>
-                  <Button
-                    size="icon"
-                    className="bg-transparent border-none p-0 hover:bg-transparent"
-                  >
-                    {/* <PhoneCall className="text-black group-hover:text-white" /> */}
-                  </Button>
+                  <Button size="icon" className="bg-transparent p-0 hover:bg-transparent"></Button>
                 </div>
-                {/* Chat */}
-                <div className="group flex justify-between items-center border-2 border-[#8E2E37] rounded-full px-4 py-2 hover:bg-[#8E2E37] transition-colors cursor-pointer">
+
+                {/* CHAT */}
+                <div className="group flex justify-between items-center border-2 border-[#8E2E37] rounded-full px-4 py-2 hover:bg-[#8E2E37] transition-colors cursor-pointer w-full">
                   <span className="text-sm font-Lato text-black group-hover:text-white">
                     Chat
                   </span>
-                  <Button
-                    size="icon"
-                    className="bg-transparent border-none p-0 hover:bg-transparent"
-                  >
+                  <Button size="icon" className="bg-transparent p-0 hover:bg-transparent">
                     <MessageCircleMore className="text-black group-hover:text-white" />
                   </Button>
                 </div>
-                {/* Decline */}
-                <div className="group flex justify-between items-center border-2 border-[#8E2E37] rounded-full px-4 py-2 hover:bg-[#8E2E37] transition-colors cursor-pointer">
+
+                {/* DECLINE */}
+                <div className="group flex justify-between items-center border-2 border-[#8E2E37] rounded-full px-4 py-2 hover:bg-[#8E2E37] transition-colors cursor-pointer w-full">
                   <span className="text-sm font-Lato text-black group-hover:text-white">
                     Decline
                   </span>
-                  <Button
-                    size="icon"
-                    className="bg-transparent border-none p-0 hover:bg-transparent"
-                  >
+                  <Button size="icon" className="bg-transparent p-0 hover:bg-transparent">
                     <X className="text-black group-hover:text-white" />
                   </Button>
                 </div>

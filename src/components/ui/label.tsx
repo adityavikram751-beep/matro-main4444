@@ -6,8 +6,19 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// ⭐ New: Fully responsive text sizes added
 const labelVariants = cva(
-  "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+  `
+  font-medium leading-none 
+  peer-disabled:cursor-not-allowed 
+  peer-disabled:opacity-70
+
+  /* RESPONSIVE FONT SIZES */
+  text-sm             /* mobile */
+  sm:text-base        /* tablet */
+  md:text-lg          /* medium screens */
+  lg:text-[1.125rem]  /* desktop large */
+`
 )
 
 const Label = React.forwardRef<
@@ -21,6 +32,7 @@ const Label = React.forwardRef<
     {...props}
   />
 ))
+
 Label.displayName = LabelPrimitive.Root.displayName
 
-export { Label } 
+export { Label }

@@ -30,11 +30,11 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   /* ---------------------------------------------------
-      LOAD TOKEN & INITIALIZE
+      LOAD TOKEN
   ---------------------------------------------------- */
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken") || testToken;
@@ -55,7 +55,7 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
     try {
       let userId: string | undefined;
 
-      // decode jwt
+      // decode jwt token
       try {
         const tokenData = JSON.parse(atob(authToken.split(".")[1]));
         userId = tokenData.userId;
@@ -124,7 +124,7 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
   };
 
   /* ---------------------------------------------------
-      SOCKET LISTENERS — MATCHING ChatArea FORMAT
+      SOCKET LISTENERS
   ---------------------------------------------------- */
   const setupSocketListeners = () => {
     if (!socket || !currentUser) return;
@@ -148,17 +148,12 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
       if (!selectedConversation) return;
       if (msg.senderId !== selectedConversation.id) return;
 
-      setMessages((prev) => [...prev, mapSocketToLocal(msg)]);
+      // messages stored only inside ChatArea UI
     });
 
-    socket.on("msg-sent", (msg: SocketMessage) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msg.tempId ? mapSocketToLocal(msg) : m
-        )
-      );
-    });
-
+    // replace optimistic message
+    socket.on("msg-sent", (msg: SocketMessage) => {});
+    
     socket.on("user-online", (userId: string) => {
       setConversations((prev) =>
         prev.map((c) => (c.id === userId ? { ...c, isOnline: true } : c))
@@ -173,18 +168,9 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
   };
 
   /* ---------------------------------------------------
-      SEND MESSAGE (FOR ChatArea)
+      UI SECTION
   ---------------------------------------------------- */
-  const onSendMessage = async (text: string, files?: File[]) => {
-    if (!currentUser || !selectedConversation) return;
 
-    // ChatArea handles optimistic UI + file preview
-    // So wrapper only forwards function
-  };
-
-  /* ---------------------------------------------------
-      UI RENDER
-  ---------------------------------------------------- */
   if (isLoading)
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -194,7 +180,7 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
 
   if (error)
     return (
-      <div className="min-h-screen flex items-center justify-center text-center">
+      <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
           <p className="text-red-600">{error}</p>
           <button
@@ -208,12 +194,16 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
     );
 
   return (
-    <div className="flex h-[calc(100vh-80px)]">
-      {/* SIDEBAR */}
+    <div className="flex h-screen w-full overflow-hidden bg-gray-50">
+
+      {/* SIDEBAR RESPONSIVE */}
       <div
-        className={`fixed md:static z-20 w-80 h-full bg-white border-r transform ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 transition-all`}
+        className={`
+          fixed top-0 left-0 h-full w-72 bg-white shadow-md z-30 
+          transform transition-transform duration-300 ease-in-out
+          md:static md:translate-x-0 
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        `}
       >
         <MessageSidebar
           conversations={conversations}
@@ -234,7 +224,8 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
       </div>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1">
+      <div className="flex-1 h-full relative bg-gray-100">
+
         {selectedConversation ? (
           <ChatArea
             conversation={selectedConversation}
@@ -249,6 +240,16 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
               <p className="text-gray-500">Select a contact to start chatting</p>
             </div>
           </div>
+        )}
+
+        {/* MOBILE — OPEN SIDEBAR BUTTON */}
+        {!selectedConversation && (
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="md:hidden fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-lg"
+          >
+            ☰
+          </button>
         )}
       </div>
     </div>

@@ -19,20 +19,8 @@ type Follow2FormProps = {
   phoneNumber: string;
   setIsProfileSetupOpen: (value: boolean) => void;
   closeModal: () => void;
-  onSignupSuccess: (token: string, userId?: string) => void; // required
+  onSignupSuccess: (token: string, userId?: string) => void;
 };
-
-const isValidEmail = (email: string) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-// Validate 10-digit phone number
-const isValidPhoneNumber = (number: string) => {
-  const phoneRegex = /^\d{10}$/;
-  return phoneRegex.test(number);
-};
-
 
 const Follow2Form = ({
   otp,
@@ -53,14 +41,16 @@ const Follow2Form = ({
     setError('');
 
     try {
-      // Test bypass
-if (otp === '1234') {
-    toast.success('OTP verified successfully! (Test mode)');
-    // Only notify parent
-    onSignupSuccess('FAKE_TOKEN'); // parent will handle MultiStepForm
-    closeModal(); // only close OTP modal
-    return;
-}
+      // 🔥 Test shortcut mode
+      if (otp === '1234') {
+        toast.success('OTP verified successfully! (Test mode)');
+
+        // Pass fake token + null userId
+        onSignupSuccess('FAKE_TOKEN', null);
+
+        closeModal();
+        return;
+      }
 
       const response = await fetch(
         'https://matrimonial-backend-7ahc.onrender.com/auth/verify-otp-register',
@@ -72,20 +62,18 @@ if (otp === '1234') {
       );
 
       const data = await response.json();
-if (data.success) {
-  toast.success('OTP verified successfully!');
-  localStorage.setItem('authToken', data.token);
 
-  // ✅ Notify parent to open MultiStepForm
-  onSignupSuccess(data.token, data.userId);
+      if (data.success) {
+        toast.success('OTP verified successfully!');
 
-  // ✅ Close OTP modal
-  closeModal();
-}
+        localStorage.setItem('authToken', data.token);
 
-      
-      
-      else {
+        // Notify parent
+        onSignupSuccess(data.token, data.userId);
+
+        // Close OTP Modal
+        closeModal();
+      } else {
         setError(data.message || 'Invalid OTP. Please try again.');
         toast.error('Verification failed');
       }
@@ -98,12 +86,8 @@ if (data.success) {
     }
   };
 
-
-
   const handleResendOtp = async () => {
     try {
-      // Here you would typically call your resend OTP API
-      // For now, we'll just show a success message
       toast.success('OTP has been resent.');
     } catch (err) {
       console.error('Error resending OTP:', err);
@@ -111,17 +95,20 @@ if (data.success) {
     }
   };
 
+  const maskedNumber =
+    phoneNumber?.replace(/(\d{2})\d{6}(\d{2})/, '$1******$2') ?? 'your phone number';
+
   return (
     <>
-      <button onClick={onBack}>
+      <button onClick={onBack} className="mb-3">
         <ArrowLeft className="h-5 w-5 text-gray-500 hover:text-rose-600 transition-colors" />
       </button>
 
-      <div className="flex flex-col items-center justify-center gap-3 mb-6">
+      <div className="flex flex-col items-center justify-center gap-2 mb-6">
         <h2 className="text-xl font-Lato text-gray-900">LOGO</h2>
         <p className="text-xl font-Lato text-gray-900">OTP VERIFICATION</p>
-        <p className="text-sm font-Lato text-gray-900">
-          We have sent the OTP to {phoneNumber ? phoneNumber.replace(/(\d{2})\d{6}(\d{2})/, '$1******$2') : 'your phone number'}
+        <p className="text-sm font-Lato text-gray-700">
+          We have sent the OTP to {maskedNumber}
         </p>
       </div>
 
@@ -155,7 +142,7 @@ if (data.success) {
       {error && (
         <p className="text-red-500 text-sm mb-4 text-center">{error}</p>
       )}
-      
+
       <Button
         onClick={verifyOtp}
         disabled={otp.length !== 4 || isLoading}
@@ -175,8 +162,7 @@ Follow2Form.propTypes = {
   onBack: PropTypes.func.isRequired,
   setIsProfileSetupOpen: PropTypes.func.isRequired,
   closeModal: PropTypes.func.isRequired,
-  onSignupSuccess: PropTypes.func.isRequired, // add this if using propTypes
+  onSignupSuccess: PropTypes.func.isRequired,
 };
-
 
 export default Follow2Form;

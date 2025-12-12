@@ -14,8 +14,9 @@ const Modal: React.FC<ModalProps> = ({ open, onClose, children }) => {
     <div
       className="
         fixed inset-0 z-50 flex items-center justify-center 
-        bg-black/30 backdrop-blur-sm
+        bg-black/40 backdrop-blur-sm 
         animate-fadeIn
+        p-3 sm:p-4
       "
     >
       <div
@@ -24,8 +25,18 @@ const Modal: React.FC<ModalProps> = ({ open, onClose, children }) => {
           rounded-2xl 
           shadow-[0_8px_24px_rgba(0,0,0,0.08)]
           border border-[#eee]
-          px-6 py-5 
-          w-[90%] sm:w-[480px] 
+
+          /* RESPONSIVE WIDTH */
+          w-[95%] 
+          sm:w-[480px]
+          md:w-[550px]
+          lg:w-[600px]
+
+          /* RESPONSIVE PADDING */
+          px-4 py-5
+          sm:px-6 sm:py-6
+          md:px-7 md:py-7
+
           max-h-[90vh] 
           overflow-y-auto 
           relative

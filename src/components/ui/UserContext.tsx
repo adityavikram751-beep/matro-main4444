@@ -17,24 +17,28 @@ const UserContext = createContext<UserContextType>({
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [profileImage, setProfileImage] = useState<ProfileImageType>(null);
 
-  // 🔥 Load image from localStorage once when app loads
+  // 🔥 Load stored image when app starts (safe for SSR)
   useEffect(() => {
-    const storedImage = localStorage.getItem("profileImage");
-    if (storedImage) {
-      setProfileImage(storedImage);
+    if (typeof window !== 'undefined') {
+      const storedImage = localStorage.getItem("profileImage");
+      if (storedImage) {
+        setProfileImage(storedImage);
+      }
     }
   }, []);
 
-  // 🔥 Whenever profileImage changes, store it globally
+  // 🔥 Store the image in localStorage whenever it changes
   useEffect(() => {
-    if (profileImage) {
+    if (typeof window !== 'undefined' && profileImage) {
       localStorage.setItem("profileImage", profileImage);
     }
   }, [profileImage]);
 
   return (
     <UserContext.Provider value={{ profileImage, setProfileImage }}>
-      {children}
+      <div className="w-full max-w-[100%] sm:max-w-[95%] mx-auto">
+        {children}
+      </div>
     </UserContext.Provider>
   );
 };

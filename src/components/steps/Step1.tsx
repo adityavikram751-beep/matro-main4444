@@ -1,11 +1,9 @@
 'use client';
 
-import { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, X } from 'lucide-react';
-import { Input } from '../ui/input';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const profileOptions = [
   { id: 'myself', label: 'Myself' },
@@ -20,27 +18,36 @@ const profileOptions = [
 interface Step1FormProps {
   profileFor: string;
   setProfileFor: (value: string) => void;
+
   FirstName: string;
   setFirstName: (value: string) => void;
+
   MiddleName: string;
   setMiddleName: (value: string) => void;
+
   LastName: string;
   setLastName: (value: string) => void;
+
   dateOfBirth: string;
   setDateOfBirth: (value: string) => void;
+
   gender: string;
   setGender: (value: string) => void;
+
   maritalStatus: string;
   setMaritalStatus: (value: string) => void;
+
   numberOfChildren: number;
   setNumberOfChildren: (value: number) => void;
+
   isChildrenLivingWithYou: boolean;
   setIsChildrenLivingWithYou: (value: boolean) => void;
+
   handleContinue: () => void;
-  onClose: () => void; // CLOSE FUNCTION
+  onClose: () => void;
 }
 
-const Step1Form: React.FC<Step1FormProps> = ({
+export default function Step1Form({
   profileFor,
   setProfileFor,
   FirstName,
@@ -60,180 +67,146 @@ const Step1Form: React.FC<Step1FormProps> = ({
   isChildrenLivingWithYou,
   setIsChildrenLivingWithYou,
   handleContinue,
-  onClose,
-}) => {
+  onClose
+}: Step1FormProps) {
+
   return (
-    <div
-      className="fixed inset-0 bg-black/40 flex justify-center items-center z-50"
-      onClick={onClose} // CLICK ANYWHERE OUTSIDE → CLOSE
-    >
-      {/* STOP PROPAGATION SO INNER CARD CLICK DOESN’T CLOSE */}
-      <div
-        className="relative bg-white p-6 rounded-md shadow-md max-h-[90vh] overflow-y-auto w-[90%] max-w-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* TOP MOST CLOSE BUTTON */}
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 p-2 rounded-full hover:bg-gray-200 transition"
-        >
-          <X className="w-5 h-5 text-gray-700" />
-        </button>
+    <div className="space-y-6">
 
-        <div className="flex items-center space-x-3 mb-6">
-          <ArrowLeft className="h-5 w-5 text-gray-500" />
-          <h2 className="text-xl font-semibold text-gray-900">
-            Please provide your basic details:
-          </h2>
+      {/* Header */}
+      <h2 className="text-xl font-semibold text-gray-800">
+        Please provide your basic details
+      </h2>
+
+      {/* Profile selection */}
+      <div>
+        <Label className="text-sm font-medium text-gray-700 mb-2 block">Profile For *</Label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {profileOptions.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setProfileFor(opt.id)}
+              className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                profileFor === opt.id
+                  ? "bg-rose-700 text-white border-rose-700 shadow"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-rose-50"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-
-        {/* Profile selection */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">
-            Select a profile for
-          </Label>
-          <div className="grid grid-cols-3 gap-2">
-            {profileOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setProfileFor(option.id)}
-                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-all duration-200 ${
-                  profileFor === option.id
-                    ? 'bg-rose-700 text-white border-rose-700 shadow-md'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-rose-300 hover:bg-rose-50'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* First Name */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">First Name *</Label>
-          <Input
-            type="text"
-            placeholder="Enter first name"
-            value={FirstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            className="w-full bg-white"
-          />
-        </div>
-
-        {/* Middle Name */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">Middle Name</Label>
-          <Input
-            type="text"
-            placeholder="Enter middle name"
-            value={MiddleName}
-            onChange={(e) => setMiddleName(e.target.value)}
-            className="w-full bg-white"
-          />
-        </div>
-
-        {/* Last Name */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">Last Name *</Label>
-          <Input
-            type="text"
-            placeholder="Enter last name"
-            value={LastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className="w-full bg-white"
-          />
-        </div>
-
-        {/* DOB */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">Date of Birth *</Label>
-          <Input
-            type="date"
-            value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
-            className="w-full bg-white"
-          />
-        </div>
-
-        {/* Gender */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">Gender *</Label>
-          <RadioGroup value={gender} onValueChange={setGender} className="flex space-x-6">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Male" id="male" />
-              <Label htmlFor="male" className="font-medium">Male</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Female" id="female" />
-              <Label htmlFor="female" className="font-medium">Female</Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        {/* Marital Status */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">Marital Status *</Label>
-          <RadioGroup value={maritalStatus} onValueChange={setMaritalStatus} className="flex space-x-6">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Unmarried" id="unmarried" />
-              <Label htmlFor="unmarried" className="font-medium">Unmarried</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Divorced" id="divorced" />
-              <Label htmlFor="divorced" className="font-medium">Divorced</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Widowed" id="widowed" />
-              <Label htmlFor="widowed" className="font-medium">Widowed</Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        {/* Number of Children */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">Number of Children</Label>
-          <Input
-            type="number"
-            placeholder="Enter number of children"
-            value={numberOfChildren}
-            onChange={(e) => setNumberOfChildren(Number(e.target.value))}
-            className="w-full bg-white"
-            min={0}
-          />
-        </div>
-
-        {/* Children Living With You */}
-        <div className="mb-6">
-          <Label className="text-sm font-medium text-gray-700 mb-3 block">
-            Children Living With You
-          </Label>
-          <RadioGroup
-            value={isChildrenLivingWithYou.toString()}
-            onValueChange={(value) => setIsChildrenLivingWithYou(value === 'true')}
-            className="flex space-x-6"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="true" id="children-yes" />
-              <Label htmlFor="children-yes" className="font-medium">Yes</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="false" id="children-no" />
-              <Label htmlFor="children-no" className="font-medium">No</Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        <Button
-          onClick={handleContinue}
-          className="w-full bg-rose-700 hover:bg-rose-800 text-white py-3 font-medium text-base shadow-lg hover:shadow-xl transition-all duration-200"
-        >
-          Continue
-        </Button>
       </div>
+
+      {/* Names */}
+      <div>
+        <Label className="font-medium">First Name *</Label>
+        <Input
+          value={FirstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          placeholder="Enter first name"
+        />
+      </div>
+
+      <div>
+        <Label className="font-medium">Middle Name</Label>
+        <Input
+          value={MiddleName}
+          onChange={(e) => setMiddleName(e.target.value)}
+          placeholder="Enter middle name"
+        />
+      </div>
+
+      <div>
+        <Label className="font-medium">Last Name *</Label>
+        <Input
+          value={LastName}
+          onChange={(e) => setLastName(e.target.value)}
+          placeholder="Enter last name"
+        />
+      </div>
+
+      {/* DOB */}
+      <div>
+        <Label className="font-medium">Date of Birth *</Label>
+        <Input
+          type="date"
+          value={dateOfBirth}
+          onChange={(e) => setDateOfBirth(e.target.value)}
+        />
+      </div>
+
+      {/* Gender */}
+      <div>
+        <Label className="font-medium">Gender *</Label>
+        <RadioGroup value={gender} onValueChange={setGender} className="flex gap-6 mt-2">
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="Male" id="male" />
+            <Label htmlFor="male">Male</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="Female" id="female" />
+            <Label htmlFor="female">Female</Label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      {/* Marital Status */}
+      <div>
+        <Label className="font-medium">Marital Status *</Label>
+        <RadioGroup value={maritalStatus} onValueChange={setMaritalStatus} className="flex gap-6 mt-2">
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="Unmarried" id="unmarried" />
+            <Label htmlFor="unmarried">Unmarried</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="Divorced" id="divorced" />
+            <Label htmlFor="divorced">Divorced</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="Widowed" id="widowed" />
+            <Label htmlFor="widowed">Widowed</Label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      {/* Children fields */}
+      <div>
+        <Label className="font-medium">Number of Children</Label>
+        <Input
+          type="number"
+          min={0}
+          value={numberOfChildren}
+          onChange={(e) => setNumberOfChildren(Number(e.target.value))}
+        />
+      </div>
+
+      <div>
+        <Label className="font-medium">Children Living With You?</Label>
+        <RadioGroup
+          value={String(isChildrenLivingWithYou)}
+          onValueChange={(v) => setIsChildrenLivingWithYou(v === "true")}
+          className="flex gap-6 mt-2"
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="true" id="with-yes" />
+            <Label htmlFor="with-yes">Yes</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="false" id="with-no" />
+            <Label htmlFor="with-no">No</Label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      {/* Continue Button */}
+      <Button
+        onClick={handleContinue}
+        className="w-full bg-rose-700 hover:bg-rose-800 text-white py-3 mt-4"
+      >
+        Continue
+      </Button>
     </div>
   );
-};
-
-export default Step1Form;
+}

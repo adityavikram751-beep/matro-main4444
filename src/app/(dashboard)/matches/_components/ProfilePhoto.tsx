@@ -11,7 +11,6 @@ import Loading from "../../../../Loading";
 export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
   const [profilesWithPhoto, setProfilesWithPhoto] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [isSendingConnection, setIsSendingConnection] = useState<any>({});
   const [isSendingLike, setIsSendingLike] = useState<any>({});
@@ -22,23 +21,20 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
   const [currentPage, setCurrentPage] = useState(1);
   const profilesPerPage = 10;
 
-  // Age
   const calculateAge = (dob: string) => {
     if (!dob) return "—";
     const d = new Date(dob);
     return new Date().getFullYear() - d.getFullYear();
   };
 
-  // Fetch profiles
+  // FETCH PROFILES
   useEffect(() => {
     if (activeTab !== "Profile with photo") return;
 
     const fetchProfiles = async () => {
       try {
-        const token = localStorage.getItem("authToken");
-
         setIsLoading(true);
-        setError(null);
+        const token = localStorage.getItem("authToken");
 
         const res = await fetch(
           "https://matrimonial-backend-7ahc.onrender.com/api/profile/with-photo",
@@ -55,19 +51,19 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
         const cleaned = (data.photo || []).map((u: any) => ({
           ...u,
           age: calculateAge(u.dateOfBirth),
-          location:
-            [u.city, u.state, u.country].filter(Boolean).join(", ") || "—",
-          languages: u.motherTongue ? [u.motherTongue] : ["—"],
           caste: u.caste || "—",
           education: u.highestEducation || "—",
           salary: u.annualIncome || "—",
           profession: u.designation || "—",
+          location:
+            [u.city, u.state, u.country].filter(Boolean).join(", ") || "—",
+          languages: u.motherTongue ? [u.motherTongue] : ["—"],
           lastSeen: "Recently",
         }));
 
         setProfilesWithPhoto(cleaned);
         setCurrentPage(1);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load profiles");
       } finally {
         setIsLoading(false);
@@ -77,12 +73,11 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
     fetchProfiles();
   }, [activeTab]);
 
-  // Remove profile
-  const removeProfile = (id: string) => {
+  // REMOVE PROFILE
+  const removeProfile = (id: string) =>
     setProfilesWithPhoto((prev) => prev.filter((p) => p._id !== id));
-  };
 
-  // Send Connection
+  // SEND CONNECTION
   const handleSendConnection = async (id: string) => {
     try {
       const token = localStorage.getItem("authToken");
@@ -90,7 +85,10 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
 
       await fetch("https://matrimonial-backend-7ahc.onrender.com/api/request/send", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ receiverId: id }),
       });
 
@@ -101,7 +99,7 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
     }
   };
 
-  // Shortlist
+  // SHORTLIST
   const handleShortlist = async (id: string) => {
     try {
       const token = localStorage.getItem("authToken");
@@ -109,7 +107,10 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
 
       await fetch("https://matrimonial-backend-7ahc.onrender.com/api/like/send", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ receiverId: id }),
       });
 
@@ -120,13 +121,16 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
     }
   };
 
-  // Skip
+  // SKIP
   const handleNotNow = async (id: string) => {
     const token = localStorage.getItem("authToken");
 
     await fetch("https://matrimonial-backend-7ahc.onrender.com/api/cross/user", {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ userIdToBlock: id }),
     });
 
@@ -136,18 +140,17 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
 
   if (activeTab !== "Profile with photo") return null;
 
-  // Pagination
+  // PAGINATION
   const totalPages = Math.ceil(profilesWithPhoto.length / profilesPerPage);
   const indexLast = currentPage * profilesPerPage;
-  const indexFirst = indexLast - profilesPerPage;
-  const currentProfiles = profilesWithPhoto.slice(indexFirst, indexLast);
+  const currentProfiles = profilesWithPhoto.slice(
+    indexLast - profilesPerPage,
+    indexLast
+  );
 
   return (
-    <div className="space-y-6 mt-6">
-      {isLoading ? (
+<div className="space-y-14 mt-0">      {isLoading ? (
         <Loading message="Loading profiles..." />
-      ) : error ? (
-        <div className="text-center text-red-600">{error}</div>
       ) : currentProfiles.length === 0 ? (
         <div className="text-center text-gray-600">No profiles found.</div>
       ) : (
@@ -155,25 +158,28 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
           {currentProfiles.map((user) => (
             <div
               key={user._id}
-              className="flex items-center justify-between p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm"
+              className="p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm
+              flex flex-col md:flex-row md:items-center md:justify-between gap-6"
             >
               {/* IMAGE */}
-              <div className="flex-shrink-0">
+              <div className="flex justify-center md:block">
                 <Image
                   src={user.profileImage || "/default-avatar.png"}
                   alt={user.firstName}
                   width={96}
                   height={96}
-                  className="w-24 h-24 rounded-full object-cover cursor-pointer"
+                  className="w-28 h-28 rounded-full object-cover cursor-pointer"
                   onClick={() => router.push(`/matches/${user._id}`)}
                 />
               </div>
 
-              {/* INFO — EXACT PROFILE MATCH STYLE */}
-              <div className="flex-1 px-6">
-                <h3 className="text-lg font-semibold">{user.firstName} {user.lastName}</h3>
+              {/* INFO */}
+              <div className="flex-1 text-center md:text-left md:px-6 space-y-1">
+                <h3 className="text-lg font-semibold">
+                  {user.firstName} {user.lastName}
+                </h3>
 
-                <p className="text-sm text-gray-500 border-b mt-2">
+                <p className="text-sm text-gray-500 border-b pb-1">
                   {user._id} | Last seen {user.lastSeen}
                 </p>
 
@@ -186,24 +192,26 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
                 </p>
 
                 <p className="text-sm text-gray-700">{user.education}</p>
-
                 <p className="text-sm text-gray-700">{user.location}</p>
-
                 <p className="text-sm text-gray-700">
                   {user.languages.join(", ")}
                 </p>
               </div>
 
-              {/* BUTTON COLUMN — SAME AS PROFILE MATCH */}
-              <div className="flex flex-col gap-5 min-w-[250px] border-l pl-4">
-
+              {/* ACTION BUTTONS — RESPONSIVE GRID */}
+              <div
+                className="
+                grid grid-cols-3 md:grid-cols-1 gap-4
+                items-center text-center md:text-left md:border-l md:pl-4
+              "
+              >
                 {/* Connection */}
-                <div className="flex items-center gap-4">
-                  <span className="text-sm">Connection</span>
+                <div className="flex flex-col items-center md:flex-row gap-2">
+                  <span className="text-sm">Connect</span>
                   <Button
                     disabled={isSendingConnection[user._id]}
                     onClick={() => handleSendConnection(user._id)}
-                    className="bg-gradient-to-r from-green-400 to-blue-400 text-white w-12 h-12 rounded-full"
+                    className="bg-gradient-to-r from-green-400 to-blue-400 text-white w-10 h-10 rounded-full"
                   >
                     {isSendingConnection[user._id] ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -214,13 +222,13 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
                 </div>
 
                 {/* Shortlist */}
-                <div className="flex items-center gap-4">
-                  <span className="text-sm">Shortlist</span>
+                <div className="flex flex-col items-center md:flex-row gap-2">
+                  <span className="text-sm">Like</span>
                   <Button
                     variant="outline"
                     disabled={isSendingLike[user._id]}
                     onClick={() => handleShortlist(user._id)}
-                    className="w-12 h-12 rounded-full"
+                    className="w-10 h-10 rounded-full"
                   >
                     {isSendingLike[user._id] ? (
                       <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
@@ -231,22 +239,21 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
                 </div>
 
                 {/* Not now */}
-                <div className="flex items-center gap-4">
-                  <span className="text-sm">Not now</span>
+                <div className="flex flex-col items-center md:flex-row gap-2">
+                  <span className="text-sm">Skip</span>
                   <Button
                     variant="outline"
                     onClick={() => handleNotNow(user._id)}
-                    className="bg-gray-200 w-12 h-12 rounded-full"
+                    className="bg-gray-200 w-10 h-10 rounded-full"
                   >
                     <X className="w-4 h-4 text-gray-600" />
                   </Button>
                 </div>
-
               </div>
             </div>
           ))}
 
-          {/* Pagination */}
+          {/* PAGINATION */}
           <div className="flex justify-center gap-4 mt-6">
             <button
               disabled={currentPage === 1}
@@ -260,7 +267,9 @@ export default function ProfilePhoto({ activeTab }: { activeTab: string }) {
               Previous
             </button>
 
-            <span>Page {currentPage} of {totalPages}</span>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
 
             <button
               disabled={currentPage === totalPages}

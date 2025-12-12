@@ -346,7 +346,7 @@ const ProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4">
+    <div className="min-h-screen bg-white p-4 sm:p-6 md:p-8 lg:p-10">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-end mb-4"></div>
 
@@ -356,7 +356,16 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-white">
+        <div
+          className="
+            grid 
+            grid-cols-1 
+            lg:grid-cols-3 
+            gap-6 
+            sm:gap-8
+          "
+        >
+          {/* LEFT COLUMN */}
           <div className="lg:col-span-1 space-y-6">
             <ProfilePhotoSection
               imageUrl={displayImage}
@@ -370,6 +379,7 @@ const ProfilePage: React.FC = () => {
             <AstroDetailsSection astroDetails={mapAstroDetails(profile)} />
           </div>
 
+          {/* RIGHT COLUMNS */}
           <div className="lg:col-span-2 space-y-6">
             {/* ⭐ Stats now shows LIVE API values */}
             <StatsSection stats={mapStats()} />

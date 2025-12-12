@@ -4,18 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import Modal from "./Modal";
 
-interface AboutMeSectionProps {
-  aboutMe?: string;
-}
-
-const API_URL =
-  "https://matrimonial-backend-7ahc.onrender.com/api/profile/self";
-const UPDATE_API_URL =
-  "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
-
-// =========================
-// CUSTOM EDIT ICON (your screenshot)
-// =========================
+/* =========================
+   CUSTOM EDIT ICON
+========================= */
 const EditIconRounded = (props: any) => (
   <svg
     width="22"
@@ -26,7 +17,7 @@ const EditIconRounded = (props: any) => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
-    className="cursor-pointer hover:stroke-gray-700 transition"
+    className="cursor-pointer hover:stroke-gray-700 transition active:scale-95"
     {...props}
   >
     <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
@@ -34,6 +25,14 @@ const EditIconRounded = (props: any) => (
     <path d="M14 6L18 10" />
   </svg>
 );
+
+interface AboutMeSectionProps {
+  aboutMe?: string;
+}
+
+const API_URL = "https://matrimonial-backend-7ahc.onrender.com/api/profile/self";
+const UPDATE_API_URL =
+  "https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile";
 
 const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
   const [about, setAbout] = useState(aboutMe || "");
@@ -46,7 +45,9 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
   const [error, setError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
 
-  // Fetch About Me
+  /* =========================
+      FETCH ABOUT ME
+  ========================== */
   useEffect(() => {
     const fetchAbout = async () => {
       try {
@@ -77,6 +78,9 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
     fetchAbout();
   }, []);
 
+  /* =========================
+      HANDLERS
+  ========================== */
   const openEdit = () => {
     setEditValue(about || "");
     setModalOpen(true);
@@ -119,9 +123,9 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
     }
   };
 
-  // -----------------------------------------
-  // UI RENDER
-  // -----------------------------------------
+  /* =========================
+      RENDER UI
+  ========================== */
 
   if (loading) {
     return (
@@ -140,10 +144,11 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
   }
 
   return (
-    <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm">
+    <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm w-full">
+      {/* STATUS MESSAGE */}
       {updateStatus && (
         <div
-          className={`mb-4 p-2 rounded ${
+          className={`mb-4 p-2 rounded text-sm ${
             updateStatus.includes("success")
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
@@ -153,22 +158,21 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
         </div>
       )}
 
-      {/* Header */}
+      {/* HEADER */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">About me</h3>
 
-        {/* Custom Icon */}
         <div onClick={openEdit}>
           <EditIconRounded />
         </div>
       </div>
 
-      {/* Text */}
-      <p className="text-gray-700 text-sm leading-relaxed">
+      {/* ABOUT TEXT */}
+      <p className="text-gray-700 text-sm sm:text-base leading-relaxed break-words whitespace-pre-wrap">
         {about || "No information provided yet."}
       </p>
 
-      {/* Modal */}
+      {/* EDIT MODAL */}
       <Modal open={modalOpen} onClose={cancelEdit}>
         <div className="mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -177,12 +181,15 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
         </div>
 
         <div className="mb-4">
-          <Label className="text-sm text-gray-700 mb-1 block">
-            About Me
-          </Label>
+          <Label className="text-sm text-gray-700 mb-1 block">About Me</Label>
+
           <textarea
             rows={5}
-            className="w-full border rounded-md p-2 text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-700"
+            className="
+              w-full border rounded-md p-3 text-gray-700 bg-white shadow-sm 
+              focus:outline-none focus:ring-2 focus:ring-rose-700
+              text-sm sm:text-base resize-none
+            "
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
           />
@@ -196,6 +203,7 @@ const AboutMeSection: React.FC<AboutMeSectionProps> = ({ aboutMe }) => {
           >
             Cancel
           </Button>
+
           <Button
             className="bg-rose-700 hover:bg-rose-800 text-white"
             onClick={save}

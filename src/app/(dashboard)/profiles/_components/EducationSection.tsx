@@ -26,7 +26,7 @@ const defaultEducation = (): EducationItem[] => [
 ];
 
 // ===============================================
-// CUSTOM EDIT ICON (same screenshot icon)
+// CUSTOM EDIT ICON
 // ===============================================
 const EditIconRounded = (props: any) => (
   <svg
@@ -160,24 +160,24 @@ const EducationSection: React.FC<EducationSectionProps> = ({
   // -------------------- UI STATES --------------------
   if (loading)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-gray-600">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-gray-600 text-center">
         Loading...
       </div>
     );
 
   if (error)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-red-600">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm text-red-600 text-center">
         {error}
       </div>
     );
 
   // -------------------- MAIN UI --------------------
   return (
-    <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm">
+    <div className="bg-[#FFF8F0] p-4 sm:p-6 rounded-2xl shadow-sm">
       {updateStatus && (
         <div
-          className={`mb-4 p-2 rounded ${
+          className={`mb-4 p-2 rounded text-center ${
             updateStatus.includes("success")
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
@@ -187,8 +187,8 @@ const EducationSection: React.FC<EducationSectionProps> = ({
         </div>
       )}
 
-      {/* HEADER WITH UPDATED ICON */}
-      <div className="flex items-center justify-between mb-4">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Education</h3>
 
         <div onClick={openEdit}>
@@ -196,11 +196,15 @@ const EducationSection: React.FC<EducationSectionProps> = ({
         </div>
       </div>
 
+      {/* Responsive details list */}
       <div className="space-y-3">
         {info.map((item, i) => (
-          <div key={i} className="flex justify-between text-sm text-gray-700">
-            <span className="w-1/2 text-gray-600">{item.label}:</span>
-            <span className="w-1/2 font-medium">
+          <div
+            key={i}
+            className="flex flex-col sm:flex-row justify-between text-sm text-gray-700"
+          >
+            <span className="sm:w-1/2 w-full text-gray-600">{item.label}:</span>
+            <span className="sm:w-1/2 w-full font-medium">
               {item.value || "Not specified"}
             </span>
           </div>
@@ -225,8 +229,13 @@ const EducationSection: React.FC<EducationSectionProps> = ({
                 <Label className="text-sm text-gray-700 mb-1 block">
                   {item.label}
                 </Label>
+
                 <input
-                  className="w-full p-2 border border-gray-300 rounded-md bg-white text-gray-700 shadow-sm focus:ring-2 focus:ring-rose-700"
+                  className="
+                    w-full p-2 border border-gray-300 rounded-md
+                    bg-white text-gray-700 shadow-sm
+                    focus:ring-2 focus:ring-rose-700 focus:outline-none
+                  "
                   value={item.value}
                   onChange={(e) => handleInputChange(i, e.target.value)}
                 />
@@ -234,17 +243,21 @@ const EducationSection: React.FC<EducationSectionProps> = ({
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
+          {/* Responsive buttons */}
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              className="bg-gray-100 text-gray-700"
+              className="bg-gray-100 text-gray-700 w-full sm:w-auto"
               onClick={() => setModalOpen(false)}
             >
               Cancel
             </Button>
 
-            <Button type="submit" className="bg-rose-700 text-white hover:bg-rose-800">
+            <Button
+              type="submit"
+              className="bg-rose-700 text-white hover:bg-rose-800 w-full sm:w-auto"
+            >
               Save
             </Button>
           </div>

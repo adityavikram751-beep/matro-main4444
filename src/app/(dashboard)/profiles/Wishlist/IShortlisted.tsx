@@ -160,43 +160,69 @@ export default function IShortlisted() {
     }
   }
 
-if (loading) 
-  return (
-    <div className="flex justify-center items-center py-20">
-      <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
+  if (loading) 
+    return (
+      <div className="flex justify-center items-center py-20">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    )
+
   if (error) return <p className="text-center text-red-500">{error}</p>
+
   if (profiles.length === 0)
     return <p className="text-center py-6">No I Shortlisted profiles found.</p>
 
   return (
     <div className="space-y-4">
-      {profiles.map((profile) => (
-        
-        <Card key={profile.id} className="p-6 bg-white rounded-lg border border-[#7D0A0A] flex justify-between items-center">
-          {/* Profile Info */}
-          <div className="flex items-start space-x-6">
-            <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300">
-                    <a href={`./Wishlist/${profile.id}`}>
 
-              <Image src={profile.image} alt={profile.name} width={96} height={96} className="object-cover" />
+      {profiles.map((profile) => (
+
+        <Card
+          key={profile.id}
+          className="
+            p-6 bg-white rounded-lg border border-[#7D0A0A]
+            flex flex-col lg:flex-row
+            items-start lg:items-center
+            justify-between gap-6
+          "
+        >
+
+          {/* PROFILE INFO */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-start gap-6 w-full lg:w-auto">
+            
+            <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300 shrink-0 mx-auto sm:mx-0">
+              <a href={`./Wishlist/${profile.id}`}>
+                <Image src={profile.image} alt={profile.name} width={96} height={96} className="object-cover" />
               </a>
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold">{profile.name}</h3>
-              <p className="text-sm text-gray-500">{profile.profileId} | {profile.lastSeen}</p>
+
+            <div className="flex-1 min-w-0 break-words">
+              <h3 className="text-lg font-semibold break-words">{profile.name}</h3>
+              <p className="text-sm text-gray-500 break-words">{profile.profileId} | {profile.lastSeen}</p>
+
               <p>{profile.age} Yrs · {profile.height} · {profile.caste}</p>
               <p>{profile.profession} · {profile.salary}</p>
               <p>{profile.education}</p>
               <p>{profile.location}</p>
-              <p>{profile.languages.join(", ")}</p>
+
+              <p className="break-words">{profile.languages.join(", ")}</p>
             </div>
+
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-4 items-center min-w-[200px] border-l pl-4">
-            {/* Send Connection */}
+          {/* ACTION BUTTONS */}
+          <div
+            className="
+              flex lg:flex-col flex-row 
+              justify-center lg:items-center items-start 
+              gap-4 w-full lg:w-[200px] 
+              border-t lg:border-t-0 lg:border-l 
+              pt-4 lg:pt-0 
+              lg:pl-4
+            "
+          >
+
+            {/* SEND CONNECTION */}
             <Button
               disabled={isProcessing[profile.id]}
               onClick={() => handleSendConnection(profile.id)}
@@ -209,7 +235,7 @@ if (loading)
               )}
             </Button>
 
-            {/* Not Now */}
+            {/* NOT NOW */}
             <Button
               disabled={isProcessing[profile.id]}
               onClick={() => handleNotNow(profile.id)}
@@ -217,9 +243,13 @@ if (loading)
             >
               <X className="w-5 h-5" />
             </Button>
+
           </div>
+
         </Card>
+
       ))}
+
     </div>
   )
 }

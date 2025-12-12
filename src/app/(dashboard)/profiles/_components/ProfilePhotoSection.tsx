@@ -22,8 +22,7 @@ const ProfilePhotoSection: React.FC<ProfilePhotoSectionProps> = ({
   useEffect(() => {
     const normalized = normalizeImage(imageUrl);
     setFinalUrl(normalized);
-    // Check if the URL is a blob URL
-    setIsBlob(normalized?.startsWith('blob:') || false);
+    setIsBlob(normalized?.startsWith("blob:") || false);
   }, [imageUrl]);
 
   const handleButtonClick = () => {
@@ -31,12 +30,24 @@ const ProfilePhotoSection: React.FC<ProfilePhotoSectionProps> = ({
   };
 
   return (
-    <div className="w-full bg-white rounded-xl shadow-sm p-5 flex flex-col items-center">
-      <div className="w-48 h-48 rounded-full overflow-hidden shadow-md relative mb-4 bg-gray-200">
+    <div
+      className="
+        w-full bg-white rounded-xl shadow-sm 
+        p-4 sm:p-5 
+        flex flex-col items-center
+      "
+    >
+      {/* RESPONSIVE PROFILE PHOTO */}
+      <div
+        className="
+          w-32 h-32 sm:w-48 sm:h-48 
+          rounded-full overflow-hidden 
+          shadow-md relative mb-4 bg-gray-200
+        "
+      >
         {finalUrl && (
           <>
             {isBlob ? (
-              // Use regular img tag for blob URLs
               <img
                 key={finalUrl}
                 src={finalUrl}
@@ -44,7 +55,6 @@ const ProfilePhotoSection: React.FC<ProfilePhotoSectionProps> = ({
                 className="w-full h-full object-cover"
               />
             ) : (
-              // Use Next.js Image component for regular URLs
               <Image
                 key={finalUrl}
                 src={finalUrl}
@@ -59,6 +69,7 @@ const ProfilePhotoSection: React.FC<ProfilePhotoSectionProps> = ({
         )}
       </div>
 
+      {/* FILE INPUT */}
       {onPhotoChange && (
         <>
           <input
@@ -70,14 +81,19 @@ const ProfilePhotoSection: React.FC<ProfilePhotoSectionProps> = ({
             disabled={photoUploading}
           />
 
+          {/* RESPONSIVE BUTTON */}
           <button
             onClick={handleButtonClick}
             disabled={photoUploading}
-            className={`px-5 py-2 text-white text-sm rounded-full transition-all ${
-              photoUploading
-                ? "bg-red-300 cursor-not-allowed"
-                : "bg-red-600 hover:bg-red-700"
-            }`}
+            className={`
+              px-5 py-2 text-white text-sm rounded-full transition-all
+              w-full sm:w-auto text-center
+              ${
+                photoUploading
+                  ? "bg-red-300 cursor-not-allowed"
+                  : "bg-red-600 hover:bg-red-700"
+              }
+            `}
           >
             {photoUploading ? "Uploading..." : "Add photos"}
           </button>

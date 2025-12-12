@@ -50,45 +50,60 @@ export default function MessageBubble({ message, onReply, onDelete }: MessageBub
 
   return (
     <div className={`flex mb-4 ${isMe ? "justify-end" : "justify-start"}`}>
-      <div className={`flex items-end gap-2 max-w-[85%]`}>
+      <div className={`flex items-end gap-2 sm:gap-3 w-full max-w-full`}>
+        
         {/* LEFT AVATAR */}
         {!isMe && (
           <img
             src={message.avatar || "/default-avatar.png"}
-            className="w-8 h-8 rounded-full object-cover"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover flex-shrink-0"
             alt="avatar"
           />
         )}
 
         {/* MESSAGE BOX */}
         <div
-          className={`p-3 rounded-2xl relative ${
-            isMe
+          className={`
+            p-3 rounded-2xl relative break-words 
+            max-w-[80%] sm:max-w-[70%] md:max-w-[60%]
+            ${isMe
               ? "bg-indigo-600 text-white rounded-br-md"
               : "bg-white text-gray-900 border shadow-sm rounded-bl-md"
-          }`}
+            }
+          `}
         >
           {/* ---------- Reply Header ---------- */}
           {message.replyTo && (
-            <div className="bg-indigo-100 border-l-4 border-indigo-600 px-2 py-1 text-xs text-indigo-800 rounded mb-2 max-w-[200px] truncate">
+            <div className="
+              bg-indigo-100 border-l-4 border-indigo-600 px-2 py-1 
+              text-xs text-indigo-800 rounded mb-2 truncate max-w-[180px] sm:max-w-[200px]
+            ">
               {message.replyTo.text || "Media"}
             </div>
           )}
 
           {/* ---------- TEXT ---------- */}
-          {message.text && <p className="text-sm mb-1">{message.text}</p>}
+          {message.text && (
+            <p className="text-sm mb-1 leading-relaxed whitespace-pre-wrap">
+              {message.text}
+            </p>
+          )}
 
           {/* ---------- FILES ---------- */}
-          {message.files && message.files.length > 0 && (
-            <div className="space-y-2 mt-2">
+          {message.files?.length > 0 && (
+            <div className="mt-2 space-y-2">
               {message.files.map((file, i) => (
                 <div key={i} className="rounded-lg overflow-hidden border relative">
+
                   {/* IMAGE FILE */}
                   {isImage(file.fileType) ? (
                     <div className="relative">
                       <img
                         src={file.fileUrl}
-                        className="w-full max-h-56 object-cover cursor-pointer"
+                        className="
+                          w-full object-cover cursor-pointer 
+                          max-h-48 sm:max-h-64 md:max-h-72 rounded-lg
+                        "
                         onClick={() => window.open(file.fileUrl, "_blank")}
                       />
 
@@ -96,13 +111,20 @@ export default function MessageBubble({ message, onReply, onDelete }: MessageBub
                       <div className="absolute top-2 right-2 flex gap-1">
                         <button
                           onClick={() => window.open(file.fileUrl, "_blank")}
-                          className="p-1 bg-black/50 text-white rounded hover:bg-black/70"
+                          className="
+                            p-1 bg-black/50 text-white rounded 
+                            hover:bg-black/70 transition
+                          "
                         >
                           <Eye size={14} />
                         </button>
+
                         <button
                           onClick={() => handleDownload(file.fileUrl, file.fileName)}
-                          className="p-1 bg-black/50 text-white rounded hover:bg-black/70"
+                          className="
+                            p-1 bg-black/50 text-white rounded 
+                            hover:bg-black/70 transition
+                          "
                         >
                           <Download size={14} />
                         </button>
@@ -111,34 +133,35 @@ export default function MessageBubble({ message, onReply, onDelete }: MessageBub
                   ) : (
                     /* OTHER FILE TYPES */
                     <div
-                      className={`flex items-center gap-3 p-3 ${
-                        isMe ? "bg-indigo-700 text-white" : "bg-gray-100"
-                      }`}
+                      className={`
+                        flex items-center gap-3 p-3 
+                        ${isMe ? "bg-indigo-700 text-white" : "bg-gray-100"}
+                      `}
                     >
                       <FileText size={22} className={isMe ? "text-white" : "text-gray-600"} />
 
                       <div className="flex-1 min-w-0">
-                        <p className={`truncate text-sm font-semibold`}>
-                          {file.fileName}
-                        </p>
+                        <p className="truncate text-sm font-semibold">{file.fileName}</p>
                         <p className="text-xs opacity-80">{formatFileSize(file.fileSize)}</p>
                       </div>
 
                       <div className="flex gap-1">
                         <button
                           onClick={() => window.open(file.fileUrl, "_blank")}
-                          className={`p-1 rounded ${
-                            isMe ? "hover:bg-white/20" : "hover:bg-gray-300"
-                          }`}
+                          className={`
+                            p-1 rounded 
+                            ${isMe ? "hover:bg-white/20" : "hover:bg-gray-300"}
+                          `}
                         >
                           <Eye size={14} />
                         </button>
 
                         <button
                           onClick={() => handleDownload(file.fileUrl, file.fileName)}
-                          className={`p-1 rounded ${
-                            isMe ? "hover:bg-white/20" : "hover:bg-gray-300"
-                          }`}
+                          className={`
+                            p-1 rounded 
+                            ${isMe ? "hover:bg-white/20" : "hover:bg-gray-300"}
+                          `}
                         >
                           <Download size={14} />
                         </button>
@@ -152,9 +175,10 @@ export default function MessageBubble({ message, onReply, onDelete }: MessageBub
 
           {/* ---------- TIME ---------- */}
           <p
-            className={`text-xs mt-1 ${
-              isMe ? "text-white/80" : "text-gray-500"
-            }`}
+            className={`
+              text-xs mt-2 
+              ${isMe ? "text-white/80" : "text-gray-500"}
+            `}
           >
             {formatTime(message.timestamp)}
           </p>
@@ -167,11 +191,11 @@ export default function MessageBubble({ message, onReply, onDelete }: MessageBub
           )}
         </div>
 
-        {/* MY AVATAR */}
+        {/* RIGHT AVATAR */}
         {isMe && (
           <img
             src={message.avatar || "/default-avatar.png"}
-            className="w-8 h-8 rounded-full object-cover"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover flex-shrink-0"
             alt="avatar"
           />
         )}

@@ -2,9 +2,9 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import {  X, MessageCircleMore } from "lucide-react"
-// import { PiPhoneCallThin } from "react-icons/pi";
+import { X, MessageCircleMore } from "lucide-react"
 import Image from "next/image"
+
 interface Profile {
     id: string
     name: string
@@ -36,7 +36,6 @@ const profiles: Profile[] = [
         location: "Delhi",
         languages: ["Hindi", "English"],
         image: "https://images.pexels.com/photos/1391498/pexels-photo-1391498.jpeg?auto=compress&cs=tinysrgb&w=400",
-
     },
     {
         id: "2",
@@ -67,38 +66,52 @@ export default function Accepted() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Navigation Tabs */}
+            {/* Tabs */}
             <div className="bg-white border-b">
-                <div className="max-w-4xl mx-auto px-4">
-                    <div className="flex gap-10 overflow-x-auto items-center justify-evenly">
+                <div className="max-w-4xl mx-auto px-2 sm:px-4">
+                    <div className="flex gap-6 sm:gap-10 overflow-x-auto items-center justify-evenly py-2">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.name}
                                 onClick={() => setActiveTab(tab.name)}
-                                className={`py-4 px-2 whitespace-nowrap text-sm font-medium border-b-2 transition-colors font-Lato  ${activeTab === tab.name
-                                    ? "border-red-500 text-red-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                    }`}
+                                className={`py-3 px-2 text-sm font-medium border-b-2 whitespace-nowrap 
+                                    ${activeTab === tab.name
+                                        ? "border-red-500 text-red-600"
+                                        : "border-transparent text-gray-500 hover:text-gray-700"}
+                                `}
                             >
                                 {tab.name}
-                                {tab.count && `(${tab.count})`}
+                                {tab.count && ` (${tab.count})`}
                             </button>
                         ))}
                     </div>
                 </div>
             </div>
 
-            <div className="flex  gap-3 items-center justify-center mt-8">
-                <Button className=" items-center border-2 border-[#8E2E37] rounded-full text-black hover:text-white bg-white transition-colors hover:bg-[#8E2E37] px-8 py-4">Accepted by her</Button>
-                <Button className="items-center border-2 border-[#8E2E37] rounded-full text-black hover:text-white bg-white transition-colors hover:bg-[#8E2E37] px-8 py-4">Accepted by Me</Button>
+            {/* Button Filters */}
+            <div className="flex flex-wrap gap-3 items-center justify-center mt-6 px-4">
+                <Button className="border-2 border-[#8E2E37] rounded-full text-black hover:text-white bg-white 
+                    hover:bg-[#8E2E37] px-6 py-3 text-sm sm:text-base">
+                    Accepted by her
+                </Button>
+
+                <Button className="border-2 border-[#8E2E37] rounded-full text-black hover:text-white bg-white 
+                    hover:bg-[#8E2E37] px-6 py-3 text-sm sm:text-base">
+                    Accepted by Me
+                </Button>
             </div>
+
             {/* Profile Cards */}
-            <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+            <div className="max-w-4xl mx-auto px-3 sm:px-4 py-6 space-y-4">
                 {profiles.map((profile) => (
-                    <Card key={profile.id} className="p-6 bg-white rounded-lg border border-[#7D0A0A]">
-                        <div className="flex items-start space-x-6">
+                    <Card
+                        key={profile.id}
+                        className="p-4 sm:p-6 bg-white rounded-lg border border-[#7D0A0A]"
+                    >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:space-x-6 gap-4">
+                            
                             {/* Profile Image */}
-                            <div className="flex-shrink-0">
+                            <div className="flex-shrink-0 mx-auto sm:mx-0">
                                 <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 border border-gray-300">
                                     <Image
                                         src={profile.image || "/placeholder.svg"}
@@ -109,64 +122,52 @@ export default function Accepted() {
                                     />
                                 </div>
                             </div>
+
                             {/* Profile Details */}
                             <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between">
-                                    <div className="border-b border-[#757575] w-full font-Lato">
-                                        <h3 className="text-lg font-semibold font-Lato text-[#1E1E1E] mb-1">{profile.name}</h3>
-                                        <p className="text-sm text-[#7A7A7A] mb-3">
-                                            {profile.profileId} | {profile.lastSeen}
-                                        </p>
-                                    </div>
+                                <div className="border-b border-[#757575] pb-2 mb-2">
+                                    <h3 className="text-lg font-semibold font-Lato text-[#1E1E1E]">
+                                        {profile.name}
+                                    </h3>
+                                    <p className="text-sm text-[#7A7A7A]">
+                                        {profile.profileId} | {profile.lastSeen}
+                                    </p>
                                 </div>
-                                <div className="space-y-1 text-sm mt-2 text-regular">
-                                    <p className="text-[#1E1E1E]">
-                                        <span className="font-Lato">{profile.age} Yrs</span> . {profile.height} . {profile.caste}
-                                    </p>
-                                    <p className="text-[#1E1E1E]">
-                                        {profile.profession} . {profile.salary}
-                                    </p>
-                                    <p className="text-[#1E1E1E]">{profile.education}</p>
-                                    <p className="text-[#1E1E1E]">{profile.location}</p>
-                                    <p className="text-[#1E1E1E]">{profile.languages.join(",")}</p>
+
+                                <div className="space-y-1 text-sm text-[#1E1E1E]">
+                                    <p>{profile.age} Yrs • {profile.height} • {profile.caste}</p>
+                                    <p>{profile.profession} • {profile.salary}</p>
+                                    <p>{profile.education}</p>
+                                    <p>{profile.location}</p>
+                                    <p>{profile.languages.join(", ")}</p>
                                 </div>
                             </div>
-                            {/* Action Buttons */}
-                            <div className="flex flex-col space-y-3 items-center  border-l border-[#757575] w-[268px]  ">
 
-                                <div className="group flex gap-3 items-center border-2 border-[#8E2E37] rounded-full px-6  transition-colors hover:bg-[#8E2E37]">
+                            {/* Action Buttons (Responsive) */}
+                            <div className="flex sm:flex-col gap-3 pt-3 sm:pt-0 sm:border-l border-[#757575] sm:pl-4 
+                                justify-between sm:justify-start w-full sm:w-[220px]">
+                                
+                                {/* Call */}
+                                <div className="group flex justify-center sm:justify-start gap-3 items-center 
+                                    border-2 border-[#8E2E37] rounded-full px-6 py-2 hover:bg-[#8E2E37] transition">
                                     <span className="text-black group-hover:text-white font-Lato">Call</span>
-                                    <Button
-                                        size="icon"
-                                        className="bg-transparent border-none p-0 hover:bg-transparent"
-                                    >
-                                        {/* <PhoneCall className="text-black group-hover:text-white" /> */}
-                                    </Button>
                                 </div>
 
-                                {/* Chat Button */}
-                                <div className="group flex gap-3 items-center border-2 border-[#8E2E37] rounded-full px-6 transition-colors hover:bg-[#8E2E37]">
+                                {/* Chat */}
+                                <div className="group flex justify-center sm:justify-start gap-3 items-center 
+                                    border-2 border-[#8E2E37] rounded-full px-6 py-2 hover:bg-[#8E2E37] transition">
                                     <span className="text-black group-hover:text-white font-Lato">Chat</span>
-                                    <Button
-                                        size="icon"
-                                        className="bg-transparent border-none p-0 hover:bg-transparent"
-                                    >
-                                        <MessageCircleMore className="text-black group-hover:text-white" />
-                                    </Button>
+                                    <MessageCircleMore className="text-black group-hover:text-white" />
                                 </div>
 
-                                {/* Decline Button */}
-                                <div className="group flex items-center border-2 border-[#8E2E37] rounded-full px-6  transition-colors hover:bg-[#8E2E37]">
+                                {/* Decline */}
+                                <div className="group flex justify-center sm:justify-start gap-3 items-center 
+                                    border-2 border-[#8E2E37] rounded-full px-6 py-2 hover:bg-[#8E2E37] transition">
                                     <span className="text-black group-hover:text-white font-Lato">Decline</span>
-                                    <Button
-                                        size="icon"
-                                        className="bg-transparent border-none p-0 hover:bg-transparent"
-                                    >
-                                        <X className="text-black group-hover:text-white " />
-                                    </Button> 
+                                    <X className="text-black group-hover:text-white" />
                                 </div>
-
                             </div>
+
                         </div>
                     </Card>
                 ))}

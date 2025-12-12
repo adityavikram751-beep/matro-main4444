@@ -23,7 +23,7 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
 
   const router = useRouter();
 
-  // ⭐ AGE
+  // ⭐ Age Calculation
   const calculateAge = (dob: string) => {
     if (!dob) return "—";
     const d = new Date(dob);
@@ -31,7 +31,7 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     return new Date().getFullYear() - d.getFullYear();
   };
 
-  // ⭐ FETCH MUTUAL MATCHES
+  // ⭐ Fetch Mutual Matches
   const fetchMutualMatches = async () => {
     try {
       const token = localStorage.getItem("authToken");
@@ -80,7 +80,6 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     }
   };
 
-  // ⭐ RUN API ON TAB CHANGE
   useEffect(() => {
     if (activeTab === "Mutual Match") {
       fetchMutualMatches();
@@ -88,12 +87,10 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     }
   }, [activeTab]);
 
-  // ⭐ REMOVE PROFILE
   const removeProfile = (id: string) => {
     setMatches((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // ⭐ SEND CONNECTION
   const handleSendConnection = async (id: string) => {
     try {
       const token = localStorage.getItem("authToken");
@@ -115,7 +112,6 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     }
   };
 
-  // ⭐ SHORTLIST
   const handleShortlist = async (id: string) => {
     try {
       const token = localStorage.getItem("authToken");
@@ -137,7 +133,6 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     }
   };
 
-  // ⭐ NOT NOW
   const handleNotNow = async (id: string) => {
     try {
       const token = localStorage.getItem("authToken");
@@ -158,7 +153,7 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     }
   };
 
-  // ⭐ PAGINATION
+  // ⭐ Pagination
   const totalPages = Math.ceil(matches.length / profilesPerPage);
   const indexLast = currentPage * profilesPerPage;
   const indexFirst = indexLast - profilesPerPage;
@@ -167,7 +162,8 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
   if (activeTab !== "Mutual Match") return null;
 
   return (
-    <div className="space-y-6 mt-6">
+<div className="space-y-14 mt-0">
+      {/* LOADING */}
       {isLoading ? (
         <div className="flex justify-center py-10">
           <div className="w-10 h-10 border-4 border-t-transparent border-black rounded-full animate-spin" />
@@ -176,28 +172,29 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
         currentProfiles.map((profile) => (
           <div
             key={profile.id}
-            className="flex items-center justify-between p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm"
+            className="p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm
+            flex flex-col md:flex-row md:items-center md:justify-between gap-6"
           >
             {/* IMAGE */}
-            <div className="flex-shrink-0">
+            <div className="flex justify-center md:block">
               <Image
                 src={profile.image}
                 alt={profile.name}
                 width={96}
                 height={96}
-                className="w-24 h-24 rounded-full object-cover cursor-pointer"
+                className="w-28 h-28 rounded-full object-cover cursor-pointer"
                 onClick={() => router.push(`/matches/${profile.id}`)}
               />
             </div>
 
             {/* INFO */}
-            <div className="flex-1 px-6">
+            <div className="flex-1 text-center md:text-left md:px-6">
               <h3 className="text-lg font-semibold">{profile.name}</h3>
-              <p className="text-sm text-gray-500 border-b mt-2">
+              <p className="text-sm text-gray-500 border-b mt-1 pb-1">
                 {profile.profileId} | Last seen {profile.lastSeen}
               </p>
 
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-gray-700 mt-1">
                 {profile.age} Yrs · {profile.height} · {profile.caste}
               </p>
 
@@ -210,12 +207,14 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
               <p className="text-sm text-gray-700">{profile.languages.join(", ")}</p>
             </div>
 
-            {/* ACTION BUTTONS */}
-            <div className="flex flex-col gap-4 items-center min-w-[250px] border-l pl-4">
-              
+            {/* ACTION BUTTONS - RESPONSIVE GRID */}
+            <div className="
+              grid grid-cols-3 md:grid-cols-1 gap-4 
+              items-center text-center md:text-left md:border-l md:pl-4
+            ">
               {/* Connection */}
-              <div className="flex items-center gap-4">
-                <span className="text-sm">Connection</span>
+              <div className="flex flex-col items-center md:flex-row gap-2">
+                <span className="text-sm">Connect</span>
                 <Button
                   disabled={isSendingConnection[profile.id]}
                   onClick={() => handleSendConnection(profile.id)}
@@ -230,8 +229,8 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
               </div>
 
               {/* Shortlist */}
-              <div className="flex items-center gap-4">
-                <span className="text-sm">Shortlist</span>
+              <div className="flex flex-col items-center md:flex-row gap-2">
+                <span className="text-sm">Like</span>
                 <Button
                   variant="outline"
                   disabled={isSendingLike[profile.id]}
@@ -246,9 +245,9 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
                 </Button>
               </div>
 
-              {/* Not Now */}
-              <div className="flex items-center gap-4">
-                <span className="text-sm">Not Now</span>
+              {/* Skip */}
+              <div className="flex flex-col items-center md:flex-row gap-2">
+                <span className="text-sm">Skip</span>
                 <Button
                   variant="outline"
                   onClick={() => handleNotNow(profile.id)}
@@ -257,6 +256,7 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
                   <X className="w-4 h-4 text-gray-600" />
                 </Button>
               </div>
+
             </div>
           </div>
         ))
@@ -271,9 +271,7 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((p) => p - 1)}
             className={`px-5 py-2 text-white rounded ${
-              currentPage === 1
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-[#219e25] hover:bg-[#1b7f1e]"
+              currentPage === 1 ? "bg-gray-300 cursor-not-allowed" : "bg-[#219e25] hover:bg-[#1b7f1e]"
             }`}
           >
             Previous
@@ -285,15 +283,14 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage((p) => p + 1)}
             className={`px-5 py-2 text-white rounded ${
-              currentPage === totalPages
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-[#219e25] hover:bg-[#1b7f1e]"
+              currentPage === totalPages ? "bg-gray-300 cursor-not-allowed" : "bg-[#219e25] hover:bg-[#1b7f1e]"
             }`}
           >
             Next
           </button>
         </div>
       )}
+
     </div>
   );
 }

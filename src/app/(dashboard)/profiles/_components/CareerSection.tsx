@@ -17,7 +17,7 @@ const getToken = () =>
   typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
 
 // ===============================================
-// CUSTOM EDIT ICON (same as screenshot)
+// CUSTOM EDIT ICON
 // ===============================================
 const EditIconRounded = (props: any) => (
   <svg
@@ -136,24 +136,25 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
   // ------------------------ UI STATES ------------------------
   if (loading)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl text-gray-600 shadow-sm">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl text-gray-600 shadow-sm text-center">
         Loading...
       </div>
     );
 
   if (error)
     return (
-      <div className="bg-[#FFF8F0] p-6 rounded-2xl text-red-600 shadow-sm">
+      <div className="bg-[#FFF8F0] p-6 rounded-2xl text-red-600 shadow-sm text-center">
         {error}
       </div>
     );
 
   // ------------------------- MAIN UI -------------------------
   return (
-    <div className="bg-[#FFF8F0] p-6 rounded-2xl shadow-sm">
+    <div className="bg-[#FFF8F0] p-4 sm:p-6 rounded-2xl shadow-sm">
+
       {updateStatus && (
         <div
-          className={`mb-4 p-2 rounded ${
+          className={`mb-4 p-2 rounded text-center ${
             updateStatus.includes("success")
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
@@ -163,10 +164,10 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Career</h3>
 
-        {/* UPDATED ICON */}
         <div
           onClick={() => {
             setEditValues(info);
@@ -177,11 +178,17 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
         </div>
       </div>
 
+      {/* Responsive Career List */}
       <div className="space-y-3">
         {info.map((item, i) => (
-          <div className="flex text-sm text-gray-700" key={i}>
-            <div className="w-1/2 text-gray-600">{item.label}:</div>
-            <div className="w-1/2 font-medium">{item.value || "Not specified"}</div>
+          <div
+            className="flex flex-col sm:flex-row text-sm text-gray-700 sm:items-center"
+            key={i}
+          >
+            <div className="sm:w-1/2 w-full text-gray-600">{item.label}:</div>
+            <div className="sm:w-1/2 w-full font-medium">
+              {item.value || "Not specified"}
+            </div>
           </div>
         ))}
       </div>
@@ -203,7 +210,11 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
               <div key={i}>
                 <Label className="mb-1 text-gray-700">{item.label}</Label>
                 <input
-                  className="w-full rounded-md border border-gray-300 p-2 text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-700"
+                  className="
+                    w-full rounded-md border border-gray-300 p-2 
+                    text-gray-700 bg-white shadow-sm
+                    focus:outline-none focus:ring-2 focus:ring-rose-700
+                  "
                   value={item.value}
                   onChange={(e) => handleInputChange(i, e.target.value)}
                 />
@@ -211,16 +222,20 @@ const CareerSection: React.FC<CareerSectionProps> = ({ career = [] }) => {
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
+          {/* Responsive Buttons */}
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
               type="button"
-              className="bg-gray-100 text-gray-700"
+              className="bg-gray-100 text-gray-700 w-full sm:w-auto"
               onClick={() => setModalOpen(false)}
               variant="outline"
             >
               Cancel
             </Button>
-            <Button className="bg-rose-700 hover:bg-rose-800 text-white" type="submit">
+            <Button
+              className="bg-rose-700 hover:bg-rose-800 text-white w-full sm:w-auto"
+              type="submit"
+            >
               Save
             </Button>
           </div>

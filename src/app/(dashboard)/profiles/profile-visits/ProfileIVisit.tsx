@@ -50,8 +50,9 @@ export default function ProfileIVisit() {
   const fetchIVisited = async () => {
     try {
       setLoading(true);
+
       const token = localStorage.getItem("authToken");
-      if (!token) throw new Error("No authentication token found. Please log in.");
+      if (!token) throw new Error("No authentication token found.");
 
       const res = await fetch("https://matrimonial-backend-7ahc.onrender.com/api/profile/view/i-viewed", {
         method: "GET",
@@ -61,7 +62,7 @@ export default function ProfileIVisit() {
         },
       });
 
-      if (!res.ok) throw new Error("Failed to fetch profiles I visited");
+      if (!res.ok) throw new Error("Failed to fetch profiles");
 
       const data = await res.json();
 
@@ -87,7 +88,7 @@ export default function ProfileIVisit() {
 
       setProfiles(mapped);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error fetching profiles I visited");
+      setError(err instanceof Error ? err.message : "Error fetching visited profiles");
     } finally {
       setLoading(false);
     }
@@ -97,7 +98,7 @@ export default function ProfileIVisit() {
     fetchIVisited();
   }, []);
 
-  // --- ACTION HANDLERS ---
+  // ================= ACTION HANDLERS =================
   const handleSendConnection = async (id: string) => {
     try {
       const token = localStorage.getItem("authToken");
@@ -113,21 +114,12 @@ export default function ProfileIVisit() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        if (data.message === "Request already exists") {
-          toast.success("Connection already sent.");
-        } else {
-          toast.error(data.message || "Failed to send connection request");
-          return;
-        }
-      } else {
-        toast.success("Connection request sent successfully.");
-      }
+      if (!res.ok) toast.error(data.message || "Failed to send connection");
+      else toast.success("Connection request sent.");
 
-      setProfiles((prev) => prev.filter((profile) => profile.id !== id));
-    } catch (error) {
-      console.error("Send Connection Error:", error);
-      toast.error("Failed to send connection request");
+      setProfiles((prev) => prev.filter((p) => p.id !== id));
+    } catch {
+      toast.error("Failed to send connection");
     } finally {
       setIsSendingConnection((prev) => ({ ...prev, [id]: false }));
     }
@@ -151,15 +143,12 @@ export default function ProfileIVisit() {
 
       const data = await res.json();
 
-      if (data.success || data.message === "Already liked") {
-        toast.success(data.message || "Profile shortlisted.");
-        setProfiles((prev) => prev.filter((profile) => profile.id !== id));
-      } else {
-        toast.error(data.message || "Failed to shortlist profile");
-      }
-    } catch (error) {
-      console.error("Shortlist Error:", error);
-      toast.error("Failed to shortlist profile");
+      if (data.success || data.message === "Already liked") toast.success("Shortlisted.");
+      else toast.error(data.message || "Failed to shortlist");
+
+      setProfiles((prev) => prev.filter((p) => p.id !== id));
+    } catch {
+      toast.error("Shortlist failed");
     } finally {
       setIsSendingLike((prev) => ({ ...prev, [id]: false }));
     }
@@ -177,51 +166,87 @@ export default function ProfileIVisit() {
       });
 
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || "Failed to skip profile");
+
+      if (!data.success) throw new Error(data.message);
 
       toast.success("Profile skipped");
-      setProfiles((prev) => prev.filter((profile) => profile.id !== id));
-    } catch (error) {
-      console.error("Not Now Error:", error);
+      setProfiles((prev) => prev.filter((p) => p.id !== id));
+    } catch {
       toast.error("Failed to skip profile");
     }
   };
 
-  // --- RENDER ---
-  if (loading) return <p className="text-center">Loading Profiles I Visited...</p>;
-  if (error) return <p className="text-center text-red-500">{error}</p>;
+  // ================ UI STATES ================
+  if (loading) return <p className="text-center py-6">Loading Profiles I Visited...</p>;
+  if (error) return <p className="text-center text-red-500 py-6">{error}</p>;
   if (profiles.length === 0) return <p className="text-center py-6">No profiles found.</p>;
 
   return (
     <div className="space-y-4">
+
       {profiles.map((profile) => (
-        <Card key={profile.id} className="p-6 bg-white rounded-lg border border-[#7D0A0A]">
-          <div className="flex items-start justify-between">
-            {/* Profile Info */}
-            <div className="flex items-start space-x-6">
-              <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300">
-                <Image src={profile.image} alt={profile.name} width={96} height={96} className="object-cover" />
+        <Card
+          key={profile.id}
+          className="
+            p-4 sm:p-6 
+            bg-white 
+            rounded-lg 
+            border border-[#7D0A0A]
+          "
+        >
+          <div
+            className="
+              flex flex-col 
+              sm:flex-row 
+              sm:items-start 
+              sm:justify-between 
+              gap-6
+            "
+          >
+            {/* -------- LEFT: Profile Info -------- */}
+            <div className="flex gap-4 sm:gap-6">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border">
+                <Image
+                  src={profile.image}
+                  alt={profile.name}
+                  width={96}
+                  height={96}
+                  className="object-cover w-full h-full"
+                />
               </div>
+
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-semibold">{profile.name}</h3>
-                <p className="text-sm text-gray-500">{profile.profileId} | {profile.lastSeen}</p>
-                <p>{profile.age} Yrs · {profile.height} · {profile.caste}</p>
-                <p>{profile.profession} · {profile.salary}</p>
-                <p>{profile.education}</p>
-                <p>{profile.location}</p>
-                <p>{profile.languages.join(", ")}</p>
+                <p className="text-sm text-gray-500">{profile.profileId} · {profile.lastSeen}</p>
+                <p className="text-sm">{profile.age} Years · {profile.height} · {profile.caste}</p>
+                <p className="text-sm">{profile.profession} · {profile.salary}</p>
+                <p className="text-sm">{profile.education}</p>
+                <p className="text-sm">{profile.location}</p>
+                <p className="text-sm text-gray-700">{profile.languages.join(", ")}</p>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-4 items-center min-w-[250px] border-l pl-4">
-              {/* Send Connection */}
+            {/* -------- RIGHT: Actions -------- */}
+            <div
+              className="
+                flex 
+                sm:flex-col 
+                justify-between 
+                gap-4 
+                sm:gap-6 
+                pt-2 
+                border-t sm:border-t-0 
+                sm:border-l 
+                sm:pl-4 
+              "
+            >
+              {/* Connection */}
               <div className="flex items-center gap-4">
                 <span className="text-sm">Connection</span>
                 <Button
                   disabled={isSendingConnection[profile.id]}
                   onClick={() => handleSendConnection(profile.id)}
-                  className="bg-gradient-to-r from-green-400 to-blue-400 text-white w-10 h-10 rounded-full"
+                  className="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center"
                 >
                   {isSendingConnection[profile.id] ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -254,7 +279,7 @@ export default function ProfileIVisit() {
                 <Button
                   variant="outline"
                   onClick={() => handleNotNow(profile.id)}
-                  className="w-10 h-10 rounded-full bg-gray-200"
+                  className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center"
                 >
                   <X className="w-4 h-4 text-gray-600" />
                 </Button>
@@ -263,6 +288,7 @@ export default function ProfileIVisit() {
           </div>
         </Card>
       ))}
+
     </div>
   );
 }

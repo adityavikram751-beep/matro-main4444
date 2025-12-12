@@ -26,7 +26,13 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
   const offset = circumference - (percentage / 100) * circumference;
 
   return (
-    <div className="relative inline-flex items-center justify-center">
+    <div
+      className="
+        relative inline-flex items-center justify-center
+        scale-[0.8] sm:scale-100        /* Responsive scaling */
+      "
+      style={{ width: size, height: size }}
+    >
       <svg
         width={size}
         height={size}
@@ -59,7 +65,12 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
 
       {/* Center Text */}
       {showText && (
-        <span className={`absolute text-sm ${textClassName}`}>
+        <span
+          className={`
+            absolute text-xs sm:text-sm    /* responsive text size */
+            ${textClassName}
+          `}
+        >
           {Math.round(percentage)}%
         </span>
       )}

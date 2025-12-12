@@ -9,9 +9,18 @@ interface StatsSectionProps {
 
 const StatsSection: React.FC<StatsSectionProps> = ({ stats }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 my-6">
+    <div
+      className="
+        grid 
+        grid-cols-1 
+        sm:grid-cols-2 
+        gap-4 sm:gap-6 
+        my-6
+      "
+    >
       {stats.slice(0, 2).map((stat, index) => {
         let href = "#";
+
         switch (stat.label) {
           case "Profile Visits":
             href = "/profiles/profile-visits";
@@ -29,10 +38,15 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats }) => {
             <div
               className="
                 bg-white 
-                border-[3px] border-[#B5343F] 
-                rounded-[28px] 
-                h-44 
+                border-[3px] border-[#B5343F]
+                rounded-[28px]
+                
+                /* Responsive height */
+                h-36 sm:h-44 
+                
                 flex flex-col items-center justify-center 
+                px-4 
+                
                 shadow-[0_6px_20px_rgba(0,0,0,0.05)]
                 hover:shadow-[0_8px_25px_rgba(0,0,0,0.12)]
                 transition-all 
@@ -43,12 +57,13 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats }) => {
               {/* Number Circle */}
               <div
                 className="
-                  w-14 h-14 
+                  w-12 h-12 sm:w-14 sm:h-14 
                   flex items-center justify-center 
                   rounded-full 
                   bg-[#FDECEC]
                   text-[#B5343F]
-                  text-2xl font-bold
+                  text-xl sm:text-2xl 
+                  font-bold
                   mb-2
                 "
               >
@@ -56,7 +71,17 @@ const StatsSection: React.FC<StatsSectionProps> = ({ stats }) => {
               </div>
 
               {/* Label */}
-              <p className="text-lg font-semibold text-gray-800 font-Lato tracking-wide">
+              <p
+                className="
+                  text-base sm:text-lg 
+                  font-semibold 
+                  text-gray-800 
+                  font-Lato 
+                  tracking-wide 
+                  text-center
+                  leading-snug
+                "
+              >
                 {stat.label}
               </p>
             </div>

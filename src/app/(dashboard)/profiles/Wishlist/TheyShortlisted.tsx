@@ -169,13 +169,22 @@ export default function TheyShortlisted() {
   return (
     <div className="space-y-4">
       {profiles.map((profile) => (
-        <Card key={profile.id} className="p-6 bg-white rounded-lg border border-[#7D0A0A] flex justify-between items-center">
+        <Card
+          key={profile.id}
+          className="
+            p-6 bg-white rounded-lg border border-[#7D0A0A]
+            flex flex-col md:flex-row md:justify-between md:items-center
+            gap-6 md:gap-0
+          "
+        >
+
           {/* Profile Info */}
-          <div className="flex items-start space-x-6">
-            <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:space-x-6 gap-4 sm:gap-6 flex-1">
+            <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-300 mx-auto sm:mx-0">
               <Image src={profile.image} alt={profile.name} width={96} height={96} className="object-cover" />
             </div>
-            <div className="flex-1 min-w-0">
+
+            <div className="flex-1 min-w-0 text-center sm:text-left">
               <h3 className="text-lg font-semibold">{profile.name}</h3>
               <p className="text-sm text-gray-500">{profile.profileId} | {profile.lastSeen}</p>
               <p>{profile.age} Yrs · {profile.height} · {profile.caste}</p>
@@ -187,7 +196,13 @@ export default function TheyShortlisted() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col gap-4 items-center min-w-[200px] border-l pl-4">
+          <div className="
+            flex md:flex-col gap-4 items-center 
+            min-w-full md:min-w-[200px]
+            border-t md:border-t-0 md:border-l 
+            pt-4 md:pt-0 md:pl-4
+          ">
+
             {/* Send Connection */}
             <Button
               disabled={isProcessing[profile.id]}
@@ -210,6 +225,7 @@ export default function TheyShortlisted() {
               <X className="w-5 h-5" />
             </Button>
           </div>
+
         </Card>
       ))}
     </div>

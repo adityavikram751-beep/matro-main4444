@@ -39,7 +39,7 @@ interface Profile {
 }
 
 function ProfilePage() {
-   
+
   const [profileData, setProfileData] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,30 +48,6 @@ function ProfilePage() {
   const { id } = useParams();
   const fallbackImage = "https://images.pexels.com/photos/1181424/pexels-photo-1181424.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&fit=crop";
 
-  // Function to save profile view
-  // const saveProfileView = async (profileId: string) => {
-  //   try {
-  //     const token = localStorage.getItem("authToken");
-  //     if (!token) return;
-
-  //     const res = await fetch("https://matrimonial-backend-7ahc.onrender.com/api/profile/view/save", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //       body: JSON.stringify({ viewedUserId: profileId })
-
-  //     });
-
-  //     const data = await res.json();
-  //     console.log("Save view response:", data);
-  //   } catch (err) {
-  //     console.error("Error saving profile view:", err);
-  //   }
-  // };
-
-  // Fetch profile data
   useEffect(() => {
     const fetchProfile = async () => {
       if (!id) {
@@ -100,13 +76,6 @@ function ProfilePage() {
     fetchProfile();
   }, [id]);
 
-  // Save view after profileData is loaded
-  // useEffect(() => {
-  //   if (profileData?._id) {
-  //     saveProfileView(profileData._id);
-  //   }
-  // }, [profileData]);
-
   const personalDetails = profileData
     ? [
         { label: "Age", value: profileData.age, icon: <User className="w-4 h-4" /> },
@@ -130,31 +99,37 @@ function ProfilePage() {
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
 
   return (
-    <div className="min-h-screen bg-white font-['Inter',system-ui,sans-serif]">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Mobile Header */}
-        <div className="lg:hidden bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">{profileData?.name || "User"}</h1>
-              <p className="text-sm text-gray-500">ID: {profileData?.id || "N/A"}</p>
+    <div className="min-h-screen bg-white font-['Inter',system-ui,sans-serif] overflow-x-hidden">
+
+      <div className="max-w-7xl mx-auto px-4 py-8 w-full">
+
+        {/* MOBILE HEADER */}
+        <div className="lg:hidden bg-white rounded-2xl shadow-lg p-6 mb-6 w-full">
+          <div className="flex items-center justify-between w-full">
+            <div className="break-words max-w-[60%]">
+              <h1 className="text-2xl font-bold text-gray-800 break-words">{profileData?.name || "User"}</h1>
+              <p className="text-sm text-gray-500 break-words">ID: {profileData?.id || "N/A"}</p>
             </div>
-            <div className="w-16 h-16 rounded-full overflow-hidden ">
+
+            <div className="w-16 h-16 rounded-full overflow-hidden shrink-0">
               <Image
                 src={profileData?.profileImage || fallbackImage}
                 alt={profileData?.name || "Profile"}
                 width={64}
                 height={64}
-                className="w-full h-full object-cover"
+                className="object-cover w-full h-full"
               />
             </div>
           </div>
         </div>
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left Column */}
-          <div className="lg:w-1/3 space-y-6">
-            {/* Profile Picture & Verification - Hidden on mobile */}
-            <div className="hidden lg:block bg-white rounded-2xl shadow-lg p-6">
+
+        {/* RESPONSIVE WRAPPER */}
+        <div className="flex flex-col lg:flex-row gap-8 w-full">
+
+          {/* LEFT COLUMN */}
+          <div className="lg:w-1/3 w-full space-y-6">
+
+            <div className="hidden lg:block bg-white rounded-2xl shadow-lg p-6 w-full">
               <div className="text-center">
                 <div className="relative w-48 h-48 mx-auto mb-4">
                   <Image
@@ -162,9 +137,10 @@ function ProfilePage() {
                     alt={profileData?.name || "Profile"}
                     width={192}
                     height={192}
-                    className="w-full h-full object-cover rounded-full border-4"
+                    className="object-cover w-full h-full rounded-full border-4"
                   />
                 </div>
+
                 <div className="bg-[#FFEDFA] border rounded-xl p-4 mb-4">
                   <div className="flex items-center justify-center gap-2 text-black">
                     <span className="font-semibold">Verified Profile</span>
@@ -174,28 +150,32 @@ function ProfilePage() {
                 </div>
               </div>
             </div>
+
           </div>
-          {/* Right Column */}
-          <div className="lg:w-2/3 space-y-6">
-            {/* Header - Hidden on mobile */}
-            <div className="hidden lg:block bg-white rounded-2xl shadow-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-800">{profileData?.name || "User"}</h1>
-                  <p className="text-gray-500">ID: {profileData?.id || "N/A"}</p>
-                  <p className="text-emerald-600 flex items-center gap-1 mt-1">
+
+          {/* RIGHT COLUMN */}
+          <div className="lg:w-2/3 w-full space-y-6">
+
+            {/* DESKTOP HEADER */}
+            <div className="hidden lg:block bg-white rounded-2xl shadow-lg p-6 w-full">
+              <div className="flex items-center justify-between mb-4 flex-wrap">
+                <div className="break-words max-w-[60%]">
+                  <h1 className="text-3xl font-bold text-gray-800 break-words">{profileData?.name || "User"}</h1>
+                  <p className="text-gray-500 break-words">ID: {profileData?.id || "N/A"}</p>
+                  <p className="text-emerald-600 flex items-center gap-1 mt-1 break-words">
                     <Clock className="w-4 h-4" />
                     Last seen: {profileData?.lastSeen || "N/A"}
                   </p>
                 </div>
-                <div className="flex gap-4 items-center">
+
+                <div className="flex gap-4 items-center flex-wrap">
                   <button className="flex items-center gap-2 bg-[#7D0A0A] text-white px-4 py-2 rounded-xl hover:bg-[#5c0707] transition-all shadow-md">
-                    <img src="/Images/You&Me.png" alt="You & Him" className="w-5 h-5" />
+                    <img src="/Images/You&Me.png" className="w-5 h-5" />
                     <span className="text-sm font-medium">You & Him</span>
                   </button>
 
                   <div className="flex flex-col items-center">
-                    <button className="flex items-center justify-center bg-gradient-to-br from-[#2BFF88] to-[#2BD2FF] text-white rounded-full w-12 h-12 transition-all shadow-lg hover:scale-105">
+                    <button className="flex items-center justify-center bg-gradient-to-br from-[#2BFF88] to-[#2BD2FF] text-white rounded-full w-12 h-12 hover:scale-105 transition">
                       <Check className="w-6 h-6" />
                     </button>
                     <span className="text-sm font-medium mt-1 text-gray-700">Accept</span>
@@ -203,58 +183,59 @@ function ProfilePage() {
                 </div>
               </div>
             </div>
-            {/* Action Buttons - Mobile Only */}
-            <div className="lg:hidden flex gap-3 mb-6 items-center">
-              <button className="flex-1 flex items-center justify-center gap-2 bg-[#7D0A0A] text-white px-3 py-3 rounded-xl text-sm font-medium shadow-md hover:bg-[#5c0707] transition-all">
-                <img src="/Images/You&Me.png" alt="You & Him" className="w-5 h-5" />
+
+            {/* MOBILE BUTTONS */}
+            <div className="lg:hidden flex gap-3 mb-6 w-full">
+              <button className="flex-1 flex items-center justify-center gap-2 bg-[#7D0A0A] text-white rounded-xl text-sm py-3 shadow-md">
+                <img src="/Images/You&Me.png" className="w-5 h-5" />
                 You & Him
               </button>
-              <button
-                onClick={() => setAstroOpen(true)}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#7D0A0A] text-white px-3 py-3 rounded-xl text-sm font-medium shadow-md hover:bg-[#5c0707] transition-all"
-              >
-                <img src="/Images/Astro.png" alt="Astro" className="w-5 h-5" />
+
+              <button onClick={() => setAstroOpen(true)} className="flex-1 flex items-center justify-center gap-2 bg-[#7D0A0A] text-white rounded-xl text-sm py-3 shadow-md">
+                <img src="/Images/Astro.png" className="w-5 h-5" />
                 Astro
               </button>
+
               <div className="flex flex-col items-center">
-                <button className="flex items-center justify-center bg-gradient-to-br from-[#2BFF88] to-[#2BD2FF] text-white rounded-full w-12 h-12 shadow-lg hover:scale-105 transition-transform">
+                <button className="bg-gradient-to-br from-[#2BFF88] to-[#2BD2FF] w-12 h-12 flex items-center justify-center rounded-full shadow-lg hover:scale-105 transition">
                   <Check className="w-6 h-6" />
                 </button>
-                <span className="text-xs font-medium mt-1 text-gray-700">Accept</span>
+                <span className="text-xs mt-1 text-gray-700">Accept</span>
               </div>
             </div>
-            {/* Personal Details */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+
+            {/* PERSONAL DETAILS */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 w-full">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Personal Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {personalDetails.map((detail, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
+                  <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-purple-50">
                     <div className="text-purple-600">{detail.icon}</div>
-                    <div>
+                    <div className="break-words">
                       <p className="text-sm text-gray-600">{detail.label}</p>
-                      <p className="font-medium text-gray-800">{detail.value}</p>
+                      <p className="font-medium text-gray-800 break-words">{detail.value}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            {/* Family Information */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+
+            {/* FAMILY INFORMATION */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 w-full">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Family Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-                  <div className="text-purple-600">
-                    <Home className="w-4 h-4" />
-                  </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-50">
+                  <Home className="text-purple-600 w-4 h-4" />
                   <div>
                     <p className="text-sm text-gray-600">Family Status</p>
                     <p className="font-medium text-gray-800">{profileData?.familyStatus || "Not Specified"}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-                  <div className="text-purple-600">
-                    <Users className="w-4 h-4" />
-                  </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-50">
+                  <Users className="text-purple-600 w-4 h-4" />
                   <div>
                     <p className="text-sm text-gray-600">Family Type</p>
                     <p className="font-medium text-gray-800">{profileData?.familyType || "Not Specified"}</p>
@@ -262,62 +243,63 @@ function ProfilePage() {
                 </div>
               </div>
             </div>
-            {/* About Myself */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+
+            {/* ABOUT MYSELF */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 w-full">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">About Myself</h2>
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4">
-                <p className="text-gray-700 leading-relaxed">{profileData?.aboutYourself || "No description available."}</p>
+              <div className="rounded-lg p-4 bg-purple-50">
+                <p className="text-gray-700 leading-relaxed break-words">{profileData?.aboutYourself || "No description available."}</p>
               </div>
             </div>
-            {/* Horoscope */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+
+            {/* HOROSCOPE */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 w-full">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Horoscope</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-                  <div className="text-purple-600">
-                    <Calendar className="w-4 h-4" />
-                  </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-50">
+                  <Calendar className="text-purple-600 w-4 h-4" />
                   <div>
                     <p className="text-sm text-gray-600">Date of Birth</p>
                     <p className="font-medium text-gray-800">{profileData?.dateOfBirth || "Not Specified"}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-                  <div className="text-purple-600">
-                    <Clock className="w-4 h-4" />
-                  </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-50">
+                  <Clock className="text-purple-600 w-4 h-4" />
                   <div>
                     <p className="text-sm text-gray-600">Time of Birth</p>
                     <p className="font-medium text-gray-800">{profileData?.timeOfBirth || "Not Specified"}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-                  <div className="text-purple-600">
-                    <Star className="w-4 h-4" />
-                  </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-50">
+                  <Star className="text-purple-600 w-4 h-4" />
                   <div>
                     <p className="text-sm text-gray-600">Zodiac (Rashi)</p>
                     <p className="font-medium text-gray-800">{profileData?.horoscope?.rashi || "Not Specified"}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
-                  <div className="text-purple-600">
-                    <Moon className="w-4 h-4" />
-                  </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-purple-50">
+                  <Moon className="text-purple-600 w-4 h-4" />
                   <div>
                     <p className="text-sm text-gray-600">Nakshatra</p>
                     <p className="font-medium text-gray-800">{profileData?.horoscope?.nakshatra || "Not Specified"}</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-4">
-                <p className="text-emerald-700 text-sm">
+
+              <div className="rounded-xl p-4 bg-emerald-50 border border-emerald-200">
+                <p className="text-emerald-700 text-sm break-words">
                   <strong>Note:</strong> {profileData?.horoscope?.matchRequired || "Horoscope match information not available"}
                 </p>
               </div>
+
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

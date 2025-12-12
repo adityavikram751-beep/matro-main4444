@@ -174,6 +174,7 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
 
   return (
     <>
+      {/* DIALOG BOX */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -184,7 +185,7 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
       </Dialog>
 
       {activeTab !== "Profile Match" ? null : (
-        <div className="space-y-6 mt-6">
+        <div className="space-y-14 mt-0">
 
           {isLoadingMatches ? (
             <Loading message="Loading matches..." />
@@ -192,46 +193,46 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
             currentMatches.map((profile) => (
               <div
                 key={profile.id}
-                className="flex items-center justify-between p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm"
+                className="p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm 
+                flex flex-col md:flex-row md:items-center md:justify-between gap-6"
               >
                 {/* IMAGE */}
-                <div className="flex-shrink-0">
+                <div className="flex justify-center md:block">
                   <Image
                     src={profile.image}
                     alt={profile.name}
                     width={96}
                     height={96}
-                    className="w-24 h-24 rounded-full object-cover cursor-pointer"
+                    className="w-28 h-28 rounded-full object-cover cursor-pointer"
                     onClick={() => router.push(`/matches/${profile.id}`)}
                   />
                 </div>
 
                 {/* INFO */}
-                <div className="flex-1 px-6">
+                <div className="flex-1 text-center md:text-left md:px-6">
                   <h3 className="text-lg font-semibold">{profile.name}</h3>
-                  <p className="text-sm text-gray-500 border-b mt-2">
+
+                  <p className="text-sm text-gray-500 border-b mt-1 pb-1">
                     {profile.profileId} | Last seen {profile.lastSeen}
                   </p>
 
-                  <p className="text-sm text-gray-700">
+                  <p className="text-sm text-gray-700 mt-1">
                     {profile.age} Yrs · {profile.height} · {profile.caste}
                   </p>
-                  <p className="text-sm text-gray-700">
-                    {profile.profession} · Earns {profile.salary}
-                  </p>
+
+                  <p className="text-sm text-gray-700">{profile.profession} · Earns {profile.salary}</p>
                   <p className="text-sm text-gray-700">{profile.education}</p>
                   <p className="text-sm text-gray-700">{profile.location}</p>
-                  <p className="text-sm text-gray-700">
-                    {profile.languages.join(", ")}
-                  </p>
+                  <p className="text-sm text-gray-700">{profile.languages.join(", ")}</p>
                 </div>
 
-                {/* ACTION BUTTONS */}
-                <div className="flex flex-col gap-4 items-center min-w-[250px] border-l pl-4">
+                {/* ACTION BUTTONS (mobile responsive grid) */}
+                <div className="grid grid-cols-3 md:grid-cols-1 gap-4 items-center text-center md:text-left 
+                md:border-l md:pl-4">
 
                   {/* Connection */}
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm">Connection</span>
+                  <div className="flex flex-col items-center md:flex-row md:items-center gap-2">
+                    <span className="text-sm">Connect</span>
                     <Button
                       disabled={isSendingConnection[profile.id]}
                       onClick={() => handleSendConnection(profile.id)}
@@ -246,8 +247,8 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
                   </div>
 
                   {/* Shortlist */}
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm">Shortlist</span>
+                  <div className="flex flex-col items-center md:flex-row md:items-center gap-2">
+                    <span className="text-sm">Like</span>
                     <Button
                       variant="outline"
                       disabled={isSendingLike[profile.id]}
@@ -262,9 +263,9 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
                     </Button>
                   </div>
 
-                  {/* Not Now */}
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm">Not Now</span>
+                  {/* Skip */}
+                  <div className="flex flex-col items-center md:flex-row md:items-center gap-2">
+                    <span className="text-sm">Skip</span>
                     <Button
                       variant="outline"
                       onClick={() => handleNotNow(profile.id)}
@@ -273,6 +274,7 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
                       <X className="w-4 h-4 text-gray-600" />
                     </Button>
                   </div>
+
                 </div>
               </div>
             ))
@@ -280,7 +282,7 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
             <div className="text-center text-gray-500">No matches found.</div>
           )}
 
-          {/* PAGINATION (FULL + PERFECT) */}
+          {/* PAGINATION */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-4 mt-6">
 

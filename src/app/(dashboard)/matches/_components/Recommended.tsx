@@ -164,8 +164,7 @@ export default function Recommendation({ activeTab }: { activeTab: string }) {
   if (activeTab !== "Preference") return null;
 
   return (
-    <div className="space-y-6 mt-6">
-      {loading ? (
+<div className="space-y-14 mt-0">      {loading ? (
         <Loading message="Loading recommended profiles..." />
       ) : currentData.length === 0 ? (
         <div className="text-center text-gray-600">No recommendations found.</div>
@@ -174,26 +173,27 @@ export default function Recommendation({ activeTab }: { activeTab: string }) {
           {currentData.map((p) => (
             <div
               key={p._id}
-              className="flex items-center justify-between p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm"
+              className="p-6 bg-white rounded-lg border border-[#7D0A0A] shadow-sm
+              flex flex-col md:flex-row md:items-center md:justify-between gap-6"
             >
               {/* IMAGE */}
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 border">
+              <div className="flex justify-center md:block">
                 <Image
                   src={p.profileImage}
                   alt={p.name}
                   width={96}
                   height={96}
                   unoptimized
-                  className="object-cover w-full h-full cursor-pointer"
+                  className="w-28 h-28 rounded-full object-cover cursor-pointer"
                   onClick={() => router.push(`/matches/${p._id}`)}
                 />
               </div>
 
               {/* INFO */}
-              <div className="flex-1 px-6">
+              <div className="flex-1 text-center md:text-left md:px-6 space-y-1">
                 <h3 className="text-lg font-semibold">{p.name}</h3>
 
-                <p className="text-sm text-gray-500 border-b mt-2">
+                <p className="text-sm text-gray-500 border-b pb-1">
                   {p._id} | Last seen {p.lastSeen}
                 </p>
 
@@ -213,45 +213,57 @@ export default function Recommendation({ activeTab }: { activeTab: string }) {
                 </p>
               </div>
 
-              {/* ACTION BUTTONS */}
-              <div className="flex flex-col gap-4 items-center min-w-[250px] border-l pl-4">
-
+              {/* ACTION BUTTONS — RESPONSIVE GRID */}
+              <div
+                className="
+                grid grid-cols-3 md:grid-cols-1 gap-4 
+                items-center text-center md:text-left md:border-l md:pl-4
+              "
+              >
                 {/* CONNECT */}
-                <Button
-                  disabled={isSendingConnection[p._id]}
-                  onClick={() => handleSendConnection(p._id)}
-                  className="bg-gradient-to-r from-green-400 to-blue-400 text-white w-10 h-10 rounded-full"
-                >
-                  {isSendingConnection[p._id] ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </Button>
+                <div className="flex flex-col items-center md:flex-row gap-2">
+                  <span className="text-sm">Connect</span>
+                  <Button
+                    disabled={isSendingConnection[p._id]}
+                    onClick={() => handleSendConnection(p._id)}
+                    className="bg-gradient-to-r from-green-400 to-blue-400 text-white w-10 h-10 rounded-full"
+                  >
+                    {isSendingConnection[p._id] ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
 
                 {/* SHORTLIST */}
-                <Button
-                  variant="outline"
-                  disabled={isSendingLike[p._id]}
-                  onClick={() => handleShortlist(p._id)}
-                  className="w-10 h-10 rounded-full"
-                >
-                  {isSendingLike[p._id] ? (
-                    <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Heart className="w-4 h-4 text-red-600" />
-                  )}
-                </Button>
+                <div className="flex flex-col items-center md:flex-row gap-2">
+                  <span className="text-sm">Like</span>
+                  <Button
+                    variant="outline"
+                    disabled={isSendingLike[p._id]}
+                    onClick={() => handleShortlist(p._id)}
+                    className="w-10 h-10 rounded-full"
+                  >
+                    {isSendingLike[p._id] ? (
+                      <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Heart className="w-4 h-4 text-red-600" />
+                    )}
+                  </Button>
+                </div>
 
                 {/* SKIP */}
-                <Button
-                  variant="outline"
-                  onClick={() => handleNotNow(p._id)}
-                  className="bg-gray-200 w-10 h-10 rounded-full"
-                >
-                  <X className="w-4 h-4 text-gray-600" />
-                </Button>
-
+                <div className="flex flex-col items-center md:flex-row gap-2">
+                  <span className="text-sm">Skip</span>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleNotNow(p._id)}
+                    className="bg-gray-200 w-10 h-10 rounded-full"
+                  >
+                    <X className="w-4 h-4 text-gray-600" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
@@ -263,8 +275,7 @@ export default function Recommendation({ activeTab }: { activeTab: string }) {
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage((p) => p - 1)}
                 className={`px-5 py-2 text-white rounded 
-                  ${currentPage === 1 ? "bg-gray-300 cursor-not-allowed" : "bg-[#219e25] hover:bg-[#1b7f1e]"}
-                `}
+                  ${currentPage === 1 ? "bg-gray-300 cursor-not-allowed" : "bg-[#219e25] hover:bg-[#1b7f1e]"}`}
               >
                 Previous
               </button>
@@ -275,14 +286,12 @@ export default function Recommendation({ activeTab }: { activeTab: string }) {
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage((p) => p + 1)}
                 className={`px-5 py-2 text-white rounded 
-                  ${currentPage === totalPages ? "bg-gray-300 cursor-not-allowed" : "bg-[#219e25] hover:bg-[#1b7f1e]"}
-                `}
+                  ${currentPage === totalPages ? "bg-gray-300 cursor-not-allowed" : "bg-[#219e25] hover:bg-[#1b7f1e]"}`}
               >
                 Next
               </button>
             </div>
           )}
-
         </>
       )}
     </div>

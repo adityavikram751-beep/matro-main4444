@@ -13,9 +13,6 @@ interface ReligiousInfoSectionProps {
 const API_URL = 'https://matrimonial-backend-7ahc.onrender.com/api/profile/self';
 const UPDATE_API_URL = 'https://matrimonial-backend-7ahc.onrender.com/api/profile/update-profile';
 
-// ===============================================
-// CUSTOM EDIT ICON (same as screenshot + all sections)
-// ===============================================
 const EditIconRounded = (props: any) => (
   <svg
     width="22"
@@ -44,9 +41,7 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
   const [error, setError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
 
-  // ------------------------------------
-  // Fetch religious profile details
-  // ------------------------------------
+  // ---------------- FETCH ----------------
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
@@ -57,9 +52,7 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
         if (!token) throw new Error('No authentication token found.');
 
         const response = await fetch(API_URL, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!response.ok) throw new Error('Failed to fetch profile');
@@ -98,9 +91,7 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
     );
   };
 
-  // ------------------------------------
-  // SAVE Updated Data
-  // ------------------------------------
+  // ---------------- SAVE ----------------
   const handleSave = async () => {
     setUpdateStatus(null);
 
@@ -137,64 +128,75 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
     }
   };
 
-  // ------------------------------------
-  // UI Rendering
-  // ------------------------------------
+  // ---------------- UI STATES ----------------
 
   if (loading)
-    return <div className="bg-[#FFF8F0] p-6 shadow-sm text-gray-600">Loading...</div>;
+    return <div className="bg-[#FFF8F0] p-6 shadow-sm text-center text-gray-600">Loading...</div>;
 
   if (error)
-    return <div className="bg-[#FFF8F0] p-6 shadow-sm text-red-500">{error}</div>;
+    return <div className="bg-[#FFF8F0] p-6 shadow-sm text-center text-red-500">{error}</div>;
 
   return (
-    <div className="bg-[#FFF8F0] p-6 shadow-sm">
+    <div className="bg-[#FFF8F0] p-4 sm:p-6 shadow-sm rounded-2xl">
+
       {updateStatus && (
         <div
-          className={`mb-4 p-2 rounded ${
-            updateStatus.includes('successfully')
+          className={`
+            mb-4 p-2 rounded text-center
+            ${updateStatus.includes('successfully')
               ? 'bg-green-100 text-green-700'
               : 'bg-red-100 text-red-700'
-          }`}
+            }
+          `}
         >
           {updateStatus}
         </div>
       )}
 
-      {/* Header + Custom Edit Icon */}
-      <div className="flex items-center justify-between mb-6">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Religious Background</h3>
-
-        {/* 🔥 UPDATED ICON HERE */}
         <div onClick={handleEdit}>
           <EditIconRounded />
         </div>
       </div>
 
-      {/* Data Display */}
-      <div className="grid grid-cols-2 divide-x divide-dashed divide-gray-300">
-        <div className="space-y-3 pr-6">
+      {/* TWO COLUMN RESPONSIVE */}
+      <div className="
+        grid 
+        grid-cols-1 
+        sm:grid-cols-2 
+        gap-4 
+        sm:divide-x 
+        divide-dashed 
+        divide-gray-300
+      ">
+        <div className="space-y-3 sm:pr-6">
           {info.slice(0, 3).map((item, i) => (
-            <div key={i} className="flex justify-between text-sm">
-              <span className="text-gray-600 w-1/2">{item.label}</span>
-              <span className="text-gray-900 font-medium w-1/2">: {item.value}</span>
+            <div key={i} className="flex flex-col sm:flex-row justify-between text-sm">
+              <span className="text-gray-600 w-full sm:w-1/2">{item.label}</span>
+              <span className="text-gray-900 font-medium w-full sm:w-1/2">
+                : {item.value}
+              </span>
             </div>
           ))}
         </div>
 
-        <div className="space-y-3 pl-6">
+        <div className="space-y-3 sm:pl-6">
           {info.slice(3).map((item, i) => (
-            <div key={i} className="flex justify-between text-sm">
-              <span className="text-gray-600 w-1/2">{item.label}</span>
-              <span className="text-gray-900 font-medium w-1/2">: {item.value}</span>
+            <div key={i} className="flex flex-col sm:flex-row justify-between text-sm">
+              <span className="text-gray-600 w-full sm:w-1/2">{item.label}</span>
+              <span className="text-gray-900 font-medium w-full sm:w-1/2">
+                : {item.value}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Modal */}
+      {/* ----------- MODAL ----------- */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
-        <div className="flex flex-col items-center gap-3 mb-4">
+        <div className="flex flex-col items-center gap-2 mb-4">
           <h2 className="text-xl font-Lato text-gray-900">Edit Religious Info</h2>
         </div>
 
@@ -209,7 +211,11 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
               <div key={index}>
                 <Label className="text-sm text-gray-700 mb-1 block">{item.label}</Label>
                 <input
-                  className="w-full rounded-md border border-gray-300 p-2 bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-700"
+                  className="
+                    w-full p-2 rounded-md border border-gray-300 
+                    bg-white text-gray-700 shadow-sm 
+                    focus:outline-none focus:ring-2 focus:ring-rose-700
+                  "
                   value={item.value}
                   onChange={e => handleInputChange(index, e.target.value)}
                 />
@@ -217,11 +223,21 @@ const ReligiousInfoSection: React.FC<ReligiousInfoSectionProps> = ({ religiousIn
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" className="bg-gray-100" onClick={() => setModalOpen(false)}>
+          {/* RESPONSIVE BUTTONS */}
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-gray-100 w-full sm:w-auto"
+              onClick={() => setModalOpen(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" className="bg-rose-700 hover:bg-rose-800 text-white">
+
+            <Button
+              type="submit"
+              className="bg-rose-700 hover:bg-rose-800 text-white w-full sm:w-auto"
+            >
               Save
             </Button>
           </div>

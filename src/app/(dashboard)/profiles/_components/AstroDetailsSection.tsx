@@ -27,7 +27,7 @@ const defaultItems = (): AstroDetailItem[] => [
 ];
 
 // ===============================================
-// CUSTOM EDIT ICON (same as your screenshot)
+// CUSTOM EDIT ICON
 // ===============================================
 const EditIconRounded = (props: any) => (
   <svg
@@ -191,18 +191,27 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
   };
 
   if (loading) {
-    return <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm text-gray-600">Loading...</div>;
+    return (
+      <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm text-gray-600 text-center">
+        Loading...
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm text-red-500">{error}</div>;
+    return (
+      <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm text-red-500 text-center">
+        {error}
+      </div>
+    );
   }
 
   return (
-    <div className="bg-[#FFF8F0] rounded-2xl p-6 shadow-sm">
+    <div className="bg-[#FFF8F0] rounded-2xl p-4 sm:p-6 shadow-sm">
+
       {updateStatus && (
         <div
-          className={`mb-4 p-2 rounded ${
+          className={`mb-4 p-2 rounded text-center text-sm ${
             updateStatus.toLowerCase().includes("saved")
               ? "bg-green-100 text-green-700"
               : "bg-yellow-100 text-yellow-700"
@@ -213,23 +222,29 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
         <h3 className="text-lg font-semibold text-gray-900">Astro Details</h3>
 
-        {/* UPDATED: Custom Edit Icon */}
-        <div onClick={openEditor}>
+        <div onClick={openEditor} className="self-end sm:self-auto">
           <EditIconRounded />
         </div>
       </div>
 
+      {/* DETAILS LIST — responsive */}
       <div className="space-y-2">
         {info.map((item, i) => (
-          <div key={i} className="flex text-sm text-gray-700">
-            <div className="w-1/2 flex items-center text-gray-600">
+          <div
+            key={i}
+            className="flex flex-col sm:flex-row text-sm text-gray-700 sm:items-center"
+          >
+            <div className="sm:w-1/2 w-full flex text-gray-600">
               <span>{item.label}</span>
               <span className="ml-1">:</span>
             </div>
-            <div className="w-1/2 font-medium">{item.value || "Not specified"}</div>
+
+            <div className="sm:w-1/2 w-full font-medium">
+              {item.value || "Not specified"}
+            </div>
           </div>
         ))}
       </div>
@@ -247,10 +262,11 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
         >
           <div className="mb-4 w-full space-y-3">
             {editValues.map((item, i) => (
-              <div key={i}>
+              <div key={i} className="w-full">
                 <Label className="text-sm font-Inter text-gray-700 mb-1 block">
                   {item.label}
                 </Label>
+
                 <input
                   className="w-full rounded-md border border-gray-300 p-2 font-Inter bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-700"
                   value={item.value ?? ""}
@@ -260,11 +276,12 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
+          {/* Buttons responsive */}
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+              className="bg-gray-100 text-gray-700 hover:bg-gray-200 w-full sm:w-auto"
               onClick={() => {
                 setEditValues(info);
                 setModalOpen(false);
@@ -272,7 +289,11 @@ const AstroDetailsSection: React.FC<AstroDetailsSectionProps> = ({ astroDetails 
             >
               Cancel
             </Button>
-            <Button type="submit" className="bg-rose-700 hover:bg-rose-800 text-white">
+
+            <Button
+              type="submit"
+              className="bg-rose-700 hover:bg-rose-800 text-white w-full sm:w-auto"
+            >
               Save
             </Button>
           </div>
