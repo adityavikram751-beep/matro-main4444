@@ -573,7 +573,7 @@ export default function MatrimonialApp() {
     <div className="min-h-screen bg-gray-50">
 
       {/* 🔥 FIXED TABS NAVBAR — RESPONSIVE UPDATED */}
-      <div className="bg-white border-b sticky top-[72px] z-40">
+      <div className="bg-white border-b sticky top-[62px] z-40">
         <div className="max-w-4xl mx-auto px-2 sm:px-4">
 
           <div className="flex gap-6 sm:gap-10 overflow-x-auto no-scrollbar items-center justify-start sm:justify-evenly py-2">

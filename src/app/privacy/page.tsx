@@ -1,6 +1,6 @@
 "use client";
 
-import Footer from "@/components/Footer";
+// import Footer from "@/components/Footer";
 import { Shield } from "lucide-react";
 
 export default function PrivacyPolicyPage() {
@@ -96,7 +96,7 @@ export default function PrivacyPolicyPage() {
       </div>
 
       {/* ---------------- FOOTER ---------------- */}
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 }

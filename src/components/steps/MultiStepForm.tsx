@@ -16,10 +16,9 @@ interface MultiStepFormProps {
 
 export default function MultiStepForm({ onClose, onSuccess }: MultiStepFormProps) {
   const [step, setStep] = useState(1);
-  const [showForm, setShowForm] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // ---------------- STATE ----------------
+  /* ---------------- STATE ---------------- */
   const [profileFor, setProfileFor] = useState('');
   const [FirstName, setFirstName] = useState('');
   const [MiddleName, setMiddleName] = useState('');
@@ -31,7 +30,8 @@ export default function MultiStepForm({ onClose, onSuccess }: MultiStepFormProps
   const [isChildrenLivingWithYou, setIsChildrenLivingWithYou] = useState(false);
 
   const [religion, setReligion] = useState('');
-  const [willingToMarryOtherCaste, setWillingToMarryOtherCaste] = useState<boolean | null>(null);
+  const [willingToMarryOtherCaste, setWillingToMarryOtherCaste] =
+    useState<boolean | null>(null);
   const [caste, setCaste] = useState('');
   const [community, setCommunity] = useState('');
   const [gotra, setGotra] = useState('');
@@ -60,310 +60,239 @@ export default function MultiStepForm({ onClose, onSuccess }: MultiStepFormProps
   const [adhaarCardFrontImage, setAdhaarCardFrontImage] = useState<File | null>(null);
   const [adhaarCardBackImage, setAdhaarCardBackImage] = useState<File | null>(null);
 
-  // ------------- CLOSE HANDLER -------------
-  const handleClose = () => {
-    setShowForm(false);
-    onClose();
-  };
-
-  // ---------------- VALIDATION ----------------
-  const validateStep = (): boolean => {
-    switch (step) {
-      case 1:
-        return !!(profileFor && FirstName && LastName && dateOfBirth && gender && maritalStatus);
-      case 2:
-        return !!(religion && motherTongue && willingToMarryOtherCaste !== null);
-      case 3:
-        return !!(height && weight && complexion && diet);
-      case 4:
-        return !!(familyType && familyStatus);
-      case 5:
-        return !!(country && state && city && highestEducation);
-      case 6:
-        return !!(employedIn && annualIncome && workLocation && designation);
-      case 7:
-        return !!(profileImage && adhaarCardFrontImage && adhaarCardBackImage);
-      default:
-        return true;
-    }
-  };
-
-  // ---------------- NAVIGATION ----------------
-  const handleNext = () => {
-    if (!validateStep()) {
-      alert(`Please fill required fields in step ${step}`);
-      return;
-    }
-    if (step < 7) setStep(step + 1);
-  };
-
+  /* ---------------- NAVIGATION ---------------- */
   const handleBack = () => {
     if (step > 1) setStep(step - 1);
-    else handleClose();
+    else onClose();
   };
 
-  // ---------------- SUBMIT ----------------
+  /* ---------------- SUBMIT ---------------- */
   const handleSubmit = async () => {
-    if (!validateStep()) {
-      alert('Please complete required fields before submitting.');
-      return;
-    }
+    if (submitting) return;
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    const token = localStorage.getItem('authToken');
     if (!token) {
-      alert('You must be logged in to submit the profile.');
+      alert('Login required');
       return;
     }
 
     setSubmitting(true);
 
-    const formDataObj = new FormData();
-    formDataObj.append('profileFor', profileFor);
-    formDataObj.append('FirstName', FirstName);
-    formDataObj.append('MiddleName', MiddleName);
-    formDataObj.append('LastName', LastName);
-    formDataObj.append('dateOfBirth', dateOfBirth);
-    formDataObj.append('gender', gender);
-    formDataObj.append('maritalStatus', maritalStatus);
-    formDataObj.append('numberOfChildren', numberOfChildren.toString());
-    formDataObj.append('isChildrenLivingWithYou', isChildrenLivingWithYou.toString());
+    const formData = new FormData();
+    formData.append('profileFor', profileFor);
+    formData.append('FirstName', FirstName);
+    formData.append('MiddleName', MiddleName);
+    formData.append('LastName', LastName);
+    formData.append('dateOfBirth', dateOfBirth);
+    formData.append('gender', gender);
+    formData.append('maritalStatus', maritalStatus);
+    formData.append('numberOfChildren', numberOfChildren.toString());
+    formData.append('isChildrenLivingWithYou', String(isChildrenLivingWithYou));
 
-    formDataObj.append('religion', religion);
-    formDataObj.append('willingToMarryOtherCaste', String(willingToMarryOtherCaste));
-    formDataObj.append('caste', caste);
-    formDataObj.append('community', community);
-    formDataObj.append('gotra', gotra);
-    formDataObj.append('motherTongue', motherTongue);
+    formData.append('religion', religion);
+    formData.append('willingToMarryOtherCaste', String(willingToMarryOtherCaste));
+    formData.append('caste', caste);
+    formData.append('community', community);
+    formData.append('gotra', gotra);
+    formData.append('motherTongue', motherTongue);
 
-    formDataObj.append('height', height);
-    formDataObj.append('weight', weight);
-    formDataObj.append('complexion', complexion);
-    formDataObj.append('anyDisability', anyDisability.toString());
-    formDataObj.append('diet', diet);
+    formData.append('height', height);
+    formData.append('weight', weight);
+    formData.append('complexion', complexion);
+    formData.append('anyDisability', String(anyDisability));
+    formData.append('diet', diet);
 
-    formDataObj.append('familyType', familyType);
-    formDataObj.append('familyStatus', familyStatus);
+    formData.append('familyType', familyType);
+    formData.append('familyStatus', familyStatus);
 
-    formDataObj.append('country', country);
-    formDataObj.append('state', state);
-    formDataObj.append('city', city);
-    formDataObj.append('highestEducation', highestEducation);
+    formData.append('country', country);
+    formData.append('state', state);
+    formData.append('city', city);
+    formData.append('highestEducation', highestEducation);
 
-    formDataObj.append('employedIn', employedIn);
-    formDataObj.append('annualIncome', annualIncome);
-    formDataObj.append('workLocation', workLocation);
-    formDataObj.append('designation', designation);
+    formData.append('employedIn', employedIn);
+    formData.append('annualIncome', annualIncome);
+    formData.append('workLocation', workLocation);
+    formData.append('designation', designation);
 
-    if (profileImage instanceof File) formDataObj.append('profileImage', profileImage);
-    if (adhaarCardFrontImage instanceof File) formDataObj.append('adhaarCardFrontImage', adhaarCardFrontImage);
-    if (adhaarCardBackImage instanceof File) formDataObj.append('adhaarCardBackImage', adhaarCardBackImage);
+    if (profileImage instanceof File) formData.append('profileImage', profileImage);
+    if (adhaarCardFrontImage) formData.append('adhaarCardFrontImage', adhaarCardFrontImage);
+    if (adhaarCardBackImage) formData.append('adhaarCardBackImage', adhaarCardBackImage);
 
     try {
-      const res = await fetch('https://matrimonial-backend-7ahc.onrender.com/auth/profile', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formDataObj,
-      });
+      const res = await fetch(
+        'https://matrimonial-backend-7ahc.onrender.com/auth/profile',
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        }
+      );
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Submission failed');
+      if (!res.ok) throw new Error(data.message || 'Failed');
 
-      alert('Profile Submitted Successfully!');
+      alert('Profile submitted successfully');
       onSuccess?.(data);
-      handleClose();
-    } catch (err: any) {
-      console.error('Submission error', err);
-      alert(err?.message || 'Something went wrong while submitting');
+      onClose();
+    } catch (e: any) {
+      alert(e.message || 'Something went wrong');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ---------------- UI ----------------
+  /* ---------------- UI ---------------- */
   return (
-    <>
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-xl mx-4 rounded-lg p-6 shadow-lg overflow-y-auto max-h-[92vh]">
-            {/* header */}
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold">Create Profile</h2>
-                <p className="text-sm text-gray-500">Step {step} of 7</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleBack}
-                  className="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleClose}
-                  className="px-3 py-2 rounded-md bg-red-50 hover:bg-red-100 text-sm text-red-600"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-xl mx-4 rounded-xl shadow-lg max-h-[92vh] overflow-y-auto">
 
-            {/* form body */}
-            <div className="space-y-6">
-              {step === 1 && (
-                <Step1Form
-                  profileFor={profileFor}
-                  setProfileFor={setProfileFor}
-                  FirstName={FirstName}
-                  setFirstName={setFirstName}
-                  MiddleName={MiddleName}
-                  setMiddleName={setMiddleName}
-                  LastName={LastName}
-                  setLastName={setLastName}
-                  dateOfBirth={dateOfBirth}
-                  setDateOfBirth={setDateOfBirth}
-                  gender={gender}
-                  setGender={setGender}
-                  maritalStatus={maritalStatus}
-                  setMaritalStatus={setMaritalStatus}
-                  numberOfChildren={numberOfChildren}
-                  setNumberOfChildren={setNumberOfChildren}
-                  isChildrenLivingWithYou={isChildrenLivingWithYou}
-                  setIsChildrenLivingWithYou={setIsChildrenLivingWithYou}
-                  handleContinue={handleNext}
-                  onClose={handleClose}
-                />
-              )}
-
-              {step === 2 && (
-                <Step2Form
-                  religion={religion}
-                  setReligion={setReligion}
-                  willingToMarryOtherCaste={willingToMarryOtherCaste}
-                  setWillingToMarryOtherCaste={setWillingToMarryOtherCaste}
-                  caste={caste}
-                  setCaste={setCaste}
-                  community={community}
-                  setCommunity={setCommunity}
-                  gotra={gotra}
-                  setGotra={setGotra}
-                  motherTongue={motherTongue}
-                  setMotherTongue={setMotherTongue}
-                  handleContinue={handleNext}
-                  onBack={handleBack}
-                  onClose={handleClose}
-                />
-              )}
-
-              {step === 3 && (
-                <Step3Form
-                  height={height}
-                  setHeight={setHeight}
-                  weight={weight}
-                  setWeight={setWeight}
-                  complexion={complexion}
-                  setComplexion={setComplexion}
-                  anyDisability={anyDisability}
-                  setAnyDisability={setAnyDisability}
-                  diet={diet}
-                  setDiet={setDiet}
-                  handleContinue={handleNext}
-                  onBack={handleBack}
-                  onClose={handleClose}
-                />
-              )}
-
-              {step === 4 && (
-                <Step4Form
-                  familyType={familyType}
-                  setFamilyType={setFamilyType}
-                  familyStatus={familyStatus}
-                  setFamilyStatus={setFamilyStatus}
-                  handleContinue={handleNext}
-                  onBack={handleBack}
-                  onClose={handleClose}
-                />
-              )}
-
-              {step === 5 && (
-                <Step5Form
-                  country={country}
-                  setCountry={setCountry}
-                  state={state}
-                  setState={setState}
-                  city={city}
-                  setCity={setCity}
-                  highestEducation={highestEducation}
-                  setHighestEducation={setHighestEducation}
-                  handleContinue={handleNext}
-                  onBack={handleBack}
-                  onClose={handleClose}
-                />
-              )}
-
-              {step === 6 && (
-                <Step6Form
-                  employedIn={employedIn}
-                  setEmployedIn={setEmployedIn}
-                  annualIncome={annualIncome}
-                  setAnnualIncome={setAnnualIncome}
-                  workLocation={workLocation}
-                  setWorkLocation={setWorkLocation}
-                  designation={designation}
-                  setDesignation={setDesignation}
-                  handleContinue={handleNext}
-                  onBack={handleBack}
-                  onClose={handleClose}
-                />
-              )}
-
-              {step === 7 && (
-                <Step7Form
-                  profileImage={profileImage}
-                  setProfileImage={setProfileImage}
-                  adhaarCardFrontImage={adhaarCardFrontImage}
-                  setAdhaarCardFrontImage={setAdhaarCardFrontImage}
-                  adhaarCardBackImage={adhaarCardBackImage}
-                  setAdhaarCardBackImage={setAdhaarCardBackImage}
-                  handleContinue={handleSubmit}
-                  onBack={handleBack}
-                  onClose={handleClose}
-                />
-              )}
-            </div>
-
-            {/* footer actions - responsive */}
-            <div className="mt-6 flex flex-col sm:flex-row items-center sm:justify-between gap-3">
-              <div className="w-full sm:w-auto flex gap-2">
-                <button
-                  onClick={handleBack}
-                  className="flex-1 sm:flex-none px-4 py-2 rounded-md border border-gray-200 hover:bg-gray-50"
-                >
-                  {step > 1 ? 'Back' : 'Cancel'}
-                </button>
-              </div>
-
-              <div className="w-full sm:w-auto flex gap-2">
-                {step < 7 ? (
-                  <button
-                    onClick={handleNext}
-                    className="w-full sm:w-auto px-4 py-2 rounded-md bg-[#7D0A0A] text-white hover:bg-[#5c0707]"
-                  >
-                    Continue
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="w-full sm:w-auto px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    {submitting ? 'Submitting...' : 'Submit Profile'}
-                  </button>
-                )}
-              </div>
-            </div>
+        {/* HEADER */}
+        <div className="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-semibold">Create Profile</h2>
+            <p className="text-sm text-gray-500">Step {step} of 7</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleBack}
+              className="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm"
+            >
+              Back
+            </button>
+            <button
+              onClick={onClose}
+              className="px-3 py-2 rounded-md bg-red-50 hover:bg-red-100 text-sm text-red-600"
+            >
+              Close
+            </button>
           </div>
         </div>
-      )}
-    </>
+
+        {/* BODY */}
+        <div className="p-4 space-y-6">
+          {step === 1 && (
+            <Step1Form
+              profileFor={profileFor}
+              setProfileFor={setProfileFor}
+              FirstName={FirstName}
+              setFirstName={setFirstName}
+              MiddleName={MiddleName}
+              setMiddleName={setMiddleName}
+              LastName={LastName}
+              setLastName={setLastName}
+              dateOfBirth={dateOfBirth}
+              setDateOfBirth={setDateOfBirth}
+              gender={gender}
+              setGender={setGender}
+              maritalStatus={maritalStatus}
+              setMaritalStatus={setMaritalStatus}
+              numberOfChildren={numberOfChildren}
+              setNumberOfChildren={setNumberOfChildren}
+              isChildrenLivingWithYou={isChildrenLivingWithYou}
+              setIsChildrenLivingWithYou={setIsChildrenLivingWithYou}
+              handleContinue={() => setStep(2)}
+              onClose={onClose}
+            />
+          )}
+
+          {step === 2 && (
+            <Step2Form
+              religion={religion}
+              setReligion={setReligion}
+              willingToMarryOtherCaste={willingToMarryOtherCaste}
+              setWillingToMarryOtherCaste={setWillingToMarryOtherCaste}
+              caste={caste}
+              setCaste={setCaste}
+              community={community}
+              setCommunity={setCommunity}
+              gotra={gotra}
+              setGotra={setGotra}
+              motherTongue={motherTongue}
+              setMotherTongue={setMotherTongue}
+              handleContinue={() => setStep(3)}
+              onBack={handleBack}
+              onClose={onClose}
+            />
+          )}
+
+          {step === 3 && (
+            <Step3Form
+              height={height}
+              setHeight={setHeight}
+              weight={weight}
+              setWeight={setWeight}
+              complexion={complexion}
+              setComplexion={setComplexion}
+              anyDisability={anyDisability}
+              setAnyDisability={setAnyDisability}
+              diet={diet}
+              setDiet={setDiet}
+              handleContinue={() => setStep(4)}
+              onBack={handleBack}
+              onClose={onClose}
+            />
+          )}
+
+          {step === 4 && (
+            <Step4Form
+              familyType={familyType}
+              setFamilyType={setFamilyType}
+              familyStatus={familyStatus}
+              setFamilyStatus={setFamilyStatus}
+              handleContinue={() => setStep(5)}
+              onBack={handleBack}
+              onClose={onClose}
+            />
+          )}
+
+          {step === 5 && (
+            <Step5Form
+              country={country}
+              setCountry={setCountry}
+              state={state}
+              setState={setState}
+              city={city}
+              setCity={setCity}
+              highestEducation={highestEducation}
+              setHighestEducation={setHighestEducation}
+              handleContinue={() => setStep(6)}
+              onBack={handleBack}
+              onClose={onClose}
+            />
+          )}
+
+          {step === 6 && (
+            <Step6Form
+              employedIn={employedIn}
+              setEmployedIn={setEmployedIn}
+              annualIncome={annualIncome}
+              setAnnualIncome={setAnnualIncome}
+              workLocation={workLocation}
+              setWorkLocation={setWorkLocation}
+              designation={designation}
+              setDesignation={setDesignation}
+              handleContinue={() => setStep(7)}
+              onBack={handleBack}
+              onClose={onClose}
+            />
+          )}
+
+          {step === 7 && (
+            <Step7Form
+              profileImage={profileImage}
+              setProfileImage={setProfileImage}
+              adhaarCardFrontImage={adhaarCardFrontImage}
+              setAdhaarCardFrontImage={setAdhaarCardFrontImage}
+              adhaarCardBackImage={adhaarCardBackImage}
+              setAdhaarCardBackImage={setAdhaarCardBackImage}
+              handleContinue={handleSubmit}
+              onBack={handleBack}
+              onClose={onClose}
+            />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

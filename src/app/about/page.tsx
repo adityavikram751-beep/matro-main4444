@@ -1,5 +1,5 @@
 import { Users, Target, Eye } from "lucide-react";
-import Footer from "@/components/Footer";
+// import Footer from "@/components/Footer";
 
 export default function AboutPage() {
   return (
@@ -92,7 +92,7 @@ export default function AboutPage() {
       </div>
 
       {/* ---------- FOOTER ---------- */}
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 }

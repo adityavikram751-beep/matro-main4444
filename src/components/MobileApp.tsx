@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';   // ✅ Correct Badge import
 import Image from 'next/image';
 import { Heart, Star, Apple, Play, MessageCircle } from 'lucide-react';
-import Footer from '@/components/Footer'; // Footer component
+// import Footer from '@/components/Footer'; // Footer component
 
 export default function MobileApp() {
   return (
@@ -110,7 +110,7 @@ export default function MobileApp() {
       </section>
 
       {/* Footer */}
-      <Footer />
+      {/* <Footer /> */}
     </div>
   );
 }

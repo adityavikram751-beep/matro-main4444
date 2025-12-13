@@ -53,7 +53,7 @@ export default function MessageInput({
                 : "Type a message..."
             }
             className="
-              w-full px-4 py-2 pr-12 bg-gray-100 border border-gray-200 
+              w-full px-4 py-2 pr-18 bg-gray-100 border border-gray-200 
               rounded-full focus:outline-none focus:ring-2 
               focus:ring-purple-500 focus:border-transparent
               disabled:bg-gray-200 disabled:text-gray-500

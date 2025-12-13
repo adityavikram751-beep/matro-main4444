@@ -1,4 +1,4 @@
-import Footer from "@/components/Footer";
+// import Footer from "@/components/Footer";
 import { FileText } from "lucide-react";
 
 export default function TermsPage() {
@@ -82,7 +82,7 @@ export default function TermsPage() {
       </div>
 
       {/* ---------------- FOOTER ---------------- */}
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import Footer from "@/components/Footer";
+// import Footer from "@/components/Footer";
 import { Phone } from "lucide-react";
 
 export default function ContactPage() {
@@ -62,7 +62,7 @@ export default function ContactPage() {
       <div className="h-10"></div>
 
       {/* ---------- FOOTER ---------- */}
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 }

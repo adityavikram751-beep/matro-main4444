@@ -1,6 +1,6 @@
 "use client";
 
-import Footer from "@/components/Footer";
+// import Footer from "@/components/Footer";
 import { HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
@@ -106,7 +106,7 @@ export default function HelpPage() {
       </div>
 
       {/* ---------------- FOOTER ---------------- */}
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 }

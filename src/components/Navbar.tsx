@@ -38,6 +38,7 @@ export default function Navbar() {
   const [profileComplete, setProfileComplete] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [displayImage, setDisplayImage] = useState<string>(DEFAULT_PROFILE_IMAGE);
+  const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false); // New state for mobile profile
 
   // Sync display image with profileImage from context
   useEffect(() => {
@@ -276,6 +277,8 @@ export default function Navbar() {
     setProfileStep(1);
     setProfileImage(DEFAULT_PROFILE_IMAGE);
     setDisplayImage(DEFAULT_PROFILE_IMAGE);
+    setMobileOpen(false);
+    setIsMobileProfileOpen(false);
     router.push('/');
   };
 
@@ -318,6 +321,8 @@ export default function Navbar() {
   const handleUpdateProfile = () => {
     setIsProfileOpen(false);
     setIsMultiStepOpen(true);
+    setMobileOpen(false);
+    setIsMobileProfileOpen(false);
   };
 
   return (
@@ -462,54 +467,128 @@ export default function Navbar() {
 
       {mobileOpen && (
         <div className="md:hidden bg-white shadow px-4 pb-4 animate-fade-in-down">
-          <ul className="flex flex-col space-y-3 mt-2">
-            {navLinks.map((link) => (
-              <li key={link.name}>
-                <a
-                  href={link.href}
-                  className="block text-gray-700 hover:text-red-500 transition-colors duration-200 font-medium"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  {link.name}
-                </a>
-              </li>
-            ))}
+          {/* Mobile Navigation Links */}
+          {isAuthenticated && (
+            <ul className="flex flex-col space-y-3 mt-2 mb-4">
+              {navLinks.map((link) => (
+                <li key={link.name}>
+                  <a
+                    href={link.href}
+                    className="block text-gray-700 hover:text-red-500 transition-colors duration-200 font-medium py-2"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
 
-            <li>
-              {!isAuthenticated ? (
-                <button
-                  className="block bg-red-500 text-white px-5 py-2 rounded hover:bg-red-600 transition-colors duration-200 font-semibold shadow text-center w-full"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    openLoginModal();
-                  }}
-                >
-                  Login
-                </button>
-              ) : (
-                <>
-                  {!profileComplete && (
-                    <button
-                      className="block bg-gray-200 text-gray-800 w-full px-5 py-2 rounded mb-2"
+          {/* Mobile Profile Section */}
+          {isAuthenticated ? (
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              {/* Profile Header */}
+              <div 
+                className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100"
+                onClick={() => setIsMobileProfileOpen(!isMobileProfileOpen)}
+              >
+                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  {displayImage && displayImage !== DEFAULT_PROFILE_IMAGE ? (
+                    <img
+                      src={displayImage}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_PROFILE_IMAGE;
+                      }}
+                    />
+                  ) : (
+                    <FaUserCircle className="text-3xl text-gray-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800">{userFirstName || 'Profile'}</p>
+                  <p className="text-xs text-gray-500">Click to view options</p>
+                </div>
+                <FaChevronDown
+                  className={`text-gray-600 transition-transform ${isMobileProfileOpen ? 'transform rotate-180' : ''}`}
+                />
+              </div>
+
+              {/* Mobile Profile Dropdown */}
+              {isMobileProfileOpen && (
+                <div className="mt-2 ml-4 border-l-2 border-gray-200 pl-4 space-y-2">
+                  <Link href="/profiles">
+                    <div 
+                      className="flex items-center space-x-2 p-2 rounded hover:bg-gray-100 cursor-pointer"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <FaUserCircle className="text-gray-600" />
+                      <span className="text-gray-700">View Profile</span>
+                    </div>
+                  </Link>
+
+                  {!profileComplete ? (
+                    <div 
+                      className="flex items-center space-x-2 p-2 rounded hover:bg-gray-100 cursor-pointer"
                       onClick={handleUpdateProfile}
                     >
-                      Complete Profile
-                    </button>
+                      <span className="text-gray-700">Complete Profile</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Link href="./profiles/Wishlist">
+                        <div 
+                          className="flex items-center space-x-2 p-2 rounded hover:bg-gray-100 cursor-pointer"
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          <span className="text-gray-700">Wishlist</span>
+                        </div>
+                      </Link>
+
+                      <Link href="/profiles/not-now">
+                        <div 
+                          className="flex items-center space-x-2 p-2 rounded hover:bg-gray-100 cursor-pointer"
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          <span className="text-gray-700">Not Now</span>
+                        </div>
+                      </Link>
+                    </>
                   )}
 
-                  <button
-                    className="block bg-red-500 text-white px-5 py-2 rounded hover:bg-red-600 transition-colors duration-200 font-semibold shadow text-center w-full"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      handleLogout();
-                    }}
+                  <div 
+                    className="flex items-center space-x-2 p-2 rounded hover:bg-gray-100 cursor-pointer text-red-600"
+                    onClick={handleLogout}
                   >
-                    Logout
-                  </button>
-                </>
+                    <FaSignOutAlt />
+                    <span>Sign out</span>
+                  </div>
+                </div>
               )}
-            </li>
-          </ul>
+
+              {/* Logout Button (Always Visible) */}
+              <button
+                className="mt-4 w-full bg-red-500 text-white px-5 py-3 rounded font-semibold hover:bg-red-600 transition-colors duration-200"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            /* Login Button for Non-Authenticated Users */
+            <div className="mt-4">
+              <button
+                className="w-full bg-[#7D0A0A] text-white px-5 py-3 rounded font-semibold hover:bg-[#5A0707] transition-colors duration-200"
+                onClick={() => {
+                  setMobileOpen(false);
+                  openLoginModal();
+                }}
+              >
+                Login
+              </button>
+            </div>
+          )}
         </div>
       )}
 
