@@ -490,58 +490,99 @@ export default function MatrimonialApp() {
                 </div>
               </>
             )}
+{/* ACCEPTED TAB */}
+{activeTab === "Accepted" && (
+  <div className="w-full flex flex-col gap-3">
 
-            {/* ACCEPTED TAB */}
-            {activeTab === "Accepted" && (
-              <>
-                <div className="group flex items-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full justify-center"></div>
+    {/* Spacer / Divider pill (as in your design) */}
+    <div className="h-10 w-full rounded-full border-2 border-[#8E2E37]" />
 
-                <div className="group flex items-center justify-between sm:justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
-                  <span className="text-black group-hover:text-white font-Lato">Chat</span>
-                  <Button
-                    size="sm"
-                    className="bg-transparent border-none p-0 hover:bg-transparent"
-                    onClick={() => handleChat(profile)}
-                  >
-                    <MessageCircleMore className="w-4 h-4 text-black group-hover:text-white" />
-                  </Button>
-                </div>
+    {/* CHAT BUTTON */}
+    <button
+      onClick={() => handleChat(profile)}
+      className="
+        group w-full h-11
+        flex items-center justify-between
+        px-4 rounded-full
+        border-2 border-[#8E2E37]
+        transition
+        hover:bg-[#8E2E37]
+      "
+    >
+      <span className="text-sm font-Lato text-black group-hover:text-white">
+        Chat
+      </span>
 
-                <div className="group flex items-center justify-between sm:justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
-                  <span className="text-black group-hover:text-white font-Lato">Reject</span>
-                  <Button
-                    size="sm"
-                    className="bg-transparent border-none p-0"
-                    onClick={() => handleUpdateStatus(profile, "rejected")}
-                  >
-                    <X className="w-4 h-4 text-black group-hover:text-white" />
-                  </Button>
-                </div>
-              </>
-            )}
+      <MessageCircleMore className="w-5 h-5 text-black group-hover:text-white" />
+    </button>
 
-            {/* SENT TAB */}
-            {activeTab === "Sent" && (
-              <>
-                <div className="h-10 border-2 border-[#8E2E37] rounded-full w-full"></div>
+    {/* REJECT BUTTON */}
+    <button
+      onClick={() => handleUpdateStatus(profile, 'rejected')}
+      className="
+        group w-full h-11
+        flex items-center justify-between
+        px-4 rounded-full
+        border-2 border-[#8E2E37]
+        transition
+        hover:bg-[#8E2E37]
+      "
+    >
+      <span className="text-sm font-Lato text-black group-hover:text-white">
+        Reject
+      </span>
 
-                <div className="group flex items-center justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
-                  <span className="text-black group-hover:text-white font-Lato">Pending</span>
-                  <ClockFading className="w-4 h-4 ml-2 text-black group-hover:text-white" />
-                </div>
+      <X className="w-5 h-5 text-black group-hover:text-white" />
+    </button>
 
-                <div className="group flex items-center justify-between sm:justify-center border-2 border-[#8E2E37] rounded-full px-4 h-10 w-full hover:bg-[#8E2E37] transition">
-                  <span className="text-black group-hover:text-white font-Lato">Delete</span>
-                  <Button
-                    size="sm"
-                    className="bg-transparent border-none p-0"
-                    onClick={() => handleDelete(profile)}
-                  >
-                    <Trash className="w-4 h-4 text-black group-hover:text-white" />
-                  </Button>
-                </div>
-              </>
-            )}
+  </div>
+)}
+
+{/* SENT TAB */}
+{activeTab === "Sent" && (
+  <div className="w-full flex flex-col gap-3">
+
+    {/* Spacer / Divider */}
+    <div className="h-10 w-full rounded-full border-2 border-[#8E2E37]" />
+
+    {/* PENDING (DISABLED STATE) */}
+    <div
+      className="
+        w-full h-11
+        flex items-center justify-between
+        px-4 rounded-full
+        border-2 border-[#8E2E37]
+        opacity-70 cursor-not-allowed
+      "
+    >
+      <span className="text-sm font-Lato text-black">
+        Pending
+      </span>
+      <ClockFading className="w-5 h-5 text-black" />
+    </div>
+
+    {/* DELETE */}
+    <button
+      onClick={() => handleDelete(profile)}
+      className="
+        group w-full h-11
+        flex items-center justify-between
+        px-4 rounded-full
+        border-2 border-[#8E2E37]
+        transition
+        hover:bg-[#8E2E37]
+      "
+    >
+      <span className="text-sm font-Lato text-black group-hover:text-white">
+        Delete
+      </span>
+
+      <Trash className="w-5 h-5 text-black group-hover:text-white" />
+    </button>
+
+  </div>
+)}
+
 
             {/* REJECTED TAB */}
             {activeTab === "Rejected" && (
