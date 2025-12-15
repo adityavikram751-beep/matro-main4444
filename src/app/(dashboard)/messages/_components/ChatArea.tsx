@@ -303,17 +303,18 @@ export default function ChatArea({
     fetchOnlineStatus();
   }, [conversation.id]);
 
-  // -------------------------
-  // Send message (optimistic UI)
-  // -------------------------
-  const onSendMessage = async (text: string, files?: File[]) => {
-    if (!currentUser || !conversation.id) return;
-    if (!text.trim() && (!files || files.length === 0)) return;
+// -------------------------
+// Send message (optimistic UI)
+// -------------------------
+const onSendMessage = async (text: string, files?: File[]) => {
+  if (!currentUser || !conversation.id) return;
+  if (!text.trim() && (!files || files.length === 0)) return;
 
-    const token = localStorage.getItem("authToken");
+  const token = localStorage.getItem("authToken");
+  const tempId = "temp-" + Date.now();
 
-    const tempId = "temp-" + Date.now();
-    const localFiles = files?.length
+  const localFiles =
+    files?.length
       ? files.map((file) => ({
           fileName: file.name,
           fileUrl: URL.createObjectURL(file),
@@ -322,56 +323,89 @@ export default function ChatArea({
         }))
       : [];
 
-    // optimistic message
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        senderId: currentUser._id,
-        receiverId: conversation.id,
-        text,
-        timestamp: new Date().toISOString(),
-        sender: "me",
-        avatar: currentUser.profileImage,
-        files: localFiles,
-      },
-    ]);
+  // ✅ OPTIMISTIC UI
+  setMessages((prev) => [
+    ...prev,
+    {
+      id: tempId,
+      senderId: currentUser._id,
+      receiverId: conversation.id,
+      text,
+      timestamp: new Date().toISOString(),
+      sender: "me",
+      avatar: currentUser.profileImage,
+      files: localFiles,
+    },
+  ]);
 
-    scrollToBottom();
+  scrollToBottom();
 
+  // ✅ SOCKET EMIT (same as before)
   socket.emit("send-msg", {
-  tempId,
-  from: currentUser._id,
-  to: conversation.id,
-  messageText: text,
-  files: localFiles,           // :star: ADD THIS :star:
-  replyToId: replyingMessage?.id || null,
-});
+    tempId,
+    from: currentUser._id,
+    to: conversation.id,
+    messageText: text,
+    files: localFiles,
+    replyToId: replyingMessage?.id || null,
+  });
 
-    // send to backend
+  try {
     const formData = new FormData();
     formData.append("receiverId", conversation.id);
-    formData.append("messageText", text);
     formData.append("replyToId", replyingMessage?.id || "");
 
-    if (files) {
+    // ⭐⭐⭐ FILE API LOGIC ⭐⭐⭐
+    if (files && files.length > 0) {
       files.forEach((file) => {
         formData.append("files", file);
       });
-    }
 
-    try {
-      await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-    } catch (err) {
-      console.error("Failed to send message to backend:", err);
-    } finally {
-      setReplyingMessage(null);
+      // 🔥 NEW FILE API
+      const res = await fetch(
+        "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        // replace temp message with backend message
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? mapSocketToMessage(data.data, currentUser, conversation)
+              : m
+          )
+        );
+      }
+    } else {
+      // 🔥 TEXT MESSAGE API (OLD)
+      formData.append("messageText", text);
+
+      await fetch(
+        "https://matrimonial-backend-7ahc.onrender.com/api/message",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
     }
-  };
+  } catch (err) {
+    console.error("Send message error:", err);
+  } finally {
+    setReplyingMessage(null);
+  }
+};
 
   // -------------------------
   // Block / Unblock / Delete chat
