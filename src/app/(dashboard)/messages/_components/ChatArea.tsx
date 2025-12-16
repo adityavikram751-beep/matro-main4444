@@ -116,7 +116,7 @@ export default function ChatArea({
           lastMsg &&
           lastMsg.senderId === msg.senderId &&
           lastMsg.text === msg.messageText &&
-          Math.abs(timeDiff) < 2000
+          Math.abs(timeDiff) < 0.00001
         ) {
           const updated = [...prev];
           updated[prev.length - 1] = mapSocketToMessage(msg, currentUser, conversation);
