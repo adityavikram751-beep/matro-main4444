@@ -48,9 +48,6 @@ export default function Home() {
     }
   }, []);
 
-  /* -------------------------------------------
-     DECODE TOKEN + INIT SOCKET
-  -------------------------------------------- */
   const decodeUserAndInitSocket = async (authToken: string) => {
     try {
       const tokenData = JSON.parse(atob(authToken.split(".")[1]));
@@ -77,9 +74,6 @@ export default function Home() {
     }
   };
 
-  /* -------------------------------------------
-     FETCH USERS
-  -------------------------------------------- */
   const fetchAllUsers = async (authToken: string, user: User) => {
     try {
       const res = await fetch(
@@ -107,9 +101,6 @@ export default function Home() {
     }
   };
 
-  /* -------------------------------------------
-     MESSAGE HANDLER
-  -------------------------------------------- */
   const handleMessageSent = (conversationId: string, text: string) => {
     if (!currentUser) return;
 
@@ -130,9 +121,6 @@ export default function Home() {
     }));
   };
 
-  /* -------------------------------------------
-     LOADING / ERROR
-  -------------------------------------------- */
   if (isLoading)
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -147,9 +135,6 @@ export default function Home() {
       </div>
     );
 
-  /* -------------------------------------------
-     MAIN RESPONSIVE LAYOUT
-  -------------------------------------------- */
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">

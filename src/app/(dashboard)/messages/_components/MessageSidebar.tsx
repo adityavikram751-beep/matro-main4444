@@ -36,7 +36,6 @@ export default function MessageSidebar({
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /* ---------------- SOCKET ONLINE STATUS ---------------- */
   useEffect(() => {
     if (!socket) return;
 
@@ -56,7 +55,6 @@ export default function MessageSidebar({
     };
   }, [socket]);
 
-  /* ---------------- FETCH ONLINE USERS ---------------- */
   useEffect(() => {
     const fetchOnlineUsers = async () => {
       try {
@@ -119,7 +117,6 @@ export default function MessageSidebar({
     </div>
   </div>
 
-  {/* Close button - mobile only */}
   <button
     onClick={onCloseSidebar}
     className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -129,7 +126,6 @@ export default function MessageSidebar({
 </div>
 
 
-      {/* ---------------- SEARCH ---------------- */}
       <div className="p-4 border-b border-gray-200">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -165,7 +161,6 @@ export default function MessageSidebar({
 
       {/* ---------------- USER LIST ---------------- */}
       <div className="flex-1 overflow-y-auto">
-        {/* EMPTY STATES */}
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <User className="w-16 h-16 text-gray-300 mb-4" />

@@ -33,9 +33,6 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
   const [messages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  /* ---------------------------------------------------
-      LOAD TOKEN
-  ---------------------------------------------------- */
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken") || testToken;
 
@@ -48,14 +45,10 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
     }
   }, []);
 
-  /* ---------------------------------------------------
-      INITIALIZE APP + SOCKET
-  ---------------------------------------------------- */
   const initializeApp = async (authToken: string) => {
     try {
       let userId: string | undefined;
 
-      // decode jwt token
       try {
         const tokenData = JSON.parse(atob(authToken.split(".")[1]));
         userId = tokenData.userId;
@@ -89,9 +82,6 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
     }
   };
 
-  /* ---------------------------------------------------
-      FETCH ALL USERS
-  ---------------------------------------------------- */
   const fetchAllUsers = async (authToken: string) => {
     try {
       const res = await fetch("https://matrimonial-backend-7ahc.onrender.com/api/message/allUser", {
@@ -123,9 +113,6 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
     }
   };
 
-  /* ---------------------------------------------------
-      SOCKET LISTENERS
-  ---------------------------------------------------- */
   const setupSocketListeners = () => {
     if (!socket || !currentUser) return;
 
@@ -148,10 +135,8 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
       if (!selectedConversation) return;
       if (msg.senderId !== selectedConversation.id) return;
 
-      // messages stored only inside ChatArea UI
     });
 
-    // replace optimistic message
     socket.on("msg-sent", (msg: SocketMessage) => {});
     
     socket.on("user-online", (userId: string) => {
@@ -167,9 +152,6 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
     });
   };
 
-  /* ---------------------------------------------------
-      UI SECTION
-  ---------------------------------------------------- */
 
   if (isLoading)
     return (

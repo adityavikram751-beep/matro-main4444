@@ -23,7 +23,6 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
 
   const router = useRouter();
 
-  // ⭐ Age Calculation
   const calculateAge = (dob: string) => {
     if (!dob) return "—";
     const d = new Date(dob);
@@ -31,7 +30,6 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     return new Date().getFullYear() - d.getFullYear();
   };
 
-  // ⭐ Fetch Mutual Matches
   const fetchMutualMatches = async () => {
     try {
       const token = localStorage.getItem("authToken");
@@ -153,7 +151,6 @@ export default function MutualMatches({ activeTab }: MutualMatchesProps) {
     }
   };
 
-  // ⭐ Pagination
   const totalPages = Math.ceil(matches.length / profilesPerPage);
   const indexLast = currentPage * profilesPerPage;
   const indexFirst = indexLast - profilesPerPage;

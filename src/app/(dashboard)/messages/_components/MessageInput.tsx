@@ -29,18 +29,15 @@ export default function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  /* TYPING STATE */
   const typingTimeout = useRef<number | null>(null);
   const isTypingRef = useRef(false);
 
-  /* Auto-resize textarea */
   useEffect(() => {
     if (!textareaRef.current) return;
     textareaRef.current.style.height = "auto";
     textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
   }, [message]);
 
-  /* Emit typing event */
   const emitTyping = () => {
     if (!socket || !currentUser) return;
 
@@ -57,7 +54,6 @@ export default function MessageInput({
     }, 900);
   };
 
-  /* Send message */
   const handleSubmit = (e: any) => {
     e.preventDefault();
 
@@ -74,7 +70,6 @@ export default function MessageInput({
     }
   };
 
-  /* ENTER-to-send */
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -82,7 +77,6 @@ export default function MessageInput({
     }
   };
 
-  /* File selection */
   const handleFileChange = (e: any) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files as FileList);
@@ -90,12 +84,10 @@ export default function MessageInput({
     e.target.value = "";
   };
 
-  /* Remove single file */
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  /* Drag/drop */
   const handleDragOver = (e: any) => {
     e.preventDefault();
     setIsDragging(true);
@@ -112,7 +104,6 @@ export default function MessageInput({
     }
   };
 
-  /* Cleanup typing on unmount */
   useEffect(() => {
     return () => {
       if (typingTimeout.current) clearTimeout(typingTimeout.current);

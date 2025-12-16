@@ -1,4 +1,3 @@
-// components/NavigationTabs.tsx
 
 interface Tab {
   name: string

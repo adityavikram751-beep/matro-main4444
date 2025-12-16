@@ -226,7 +226,6 @@ export default function AllMatches({ activeTab }: AllMatchesProps) {
                   <p className="text-sm text-gray-700">{profile.languages.join(", ")}</p>
                 </div>
 
-                {/* ACTION BUTTONS (mobile responsive grid) */}
                 <div className="grid grid-cols-3 md:grid-cols-1 gap-4 items-center text-center md:text-left 
                 md:border-l md:pl-4">
 
