@@ -65,7 +65,6 @@ export default function ChatWrapper({ testToken }: ChatWrapperProps) {
         return;
       }
 
-      // init socket
       socket = io("https://matrimonial-backend-7ahc.onrender.com", {
         transports: ["websocket"],
       });

@@ -47,7 +47,7 @@ export default function ContactPage() {
         {/* RIGHT CONTACT INFO (CENTERED VERTICALLY & SPACED) */}
         <div className="flex flex-col justify-center space-y-5 text-[17px] text-[#2A2A2A] leading-relaxed pr-4">
           <p className="font-medium">
-            2nd Floor, 108 Sector 2, Noida 201301, UP
+         Noida 201301, UP
           </p>
 
           <p className="font-medium">+91 9999999999</p>

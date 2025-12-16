@@ -40,14 +40,12 @@ export default function Navbar() {
   const [displayImage, setDisplayImage] = useState<string>(DEFAULT_PROFILE_IMAGE);
   const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false); // New state for mobile profile
 
-  // Sync display image with profileImage from context
   useEffect(() => {
     const normalized = normalizeImage(profileImage);
     if (normalized && normalized !== DEFAULT_PROFILE_IMAGE) {
       console.log('Navbar: Setting display image:', normalized);
       setDisplayImage(normalized);
     } else {
-      // Try to get from localStorage as fallback
       const storedImage = localStorage.getItem('profileImage');
       if (storedImage && storedImage !== DEFAULT_PROFILE_IMAGE) {
         const normalizedStored = normalizeImage(storedImage);
@@ -59,7 +57,6 @@ export default function Navbar() {
     }
   }, [profileImage]);
 
-  // Listen for profile image updates from ProfilePage
   useEffect(() => {
     const handleProfileImageUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
@@ -103,7 +100,6 @@ export default function Navbar() {
       
       const user = data.data || data.user || data;
 
-      // Normalize profile image with detailed logging
       let normalizedImage = DEFAULT_PROFILE_IMAGE;
       
       console.log('Navbar: Raw profileImage from API:', user.profileImage);
@@ -183,7 +179,6 @@ export default function Navbar() {
             '';
           setUserFirstName(firstName);
 
-          // Get stored image and normalize it
           const storedImage =
             parsedData.profileImage ||
             parsedData.basicInfo?.profileImage ||
@@ -210,7 +205,6 @@ export default function Navbar() {
         }
       }
 
-      // Fetch fresh data from server
       fetchUser();
     }
   }, [setProfileImage]);
@@ -228,7 +222,6 @@ export default function Navbar() {
       if (response.ok) {
         const userData = await response.json();
         
-        // Normalize profile image before storing
         let normalizedImage = DEFAULT_PROFILE_IMAGE;
         if (userData.profileImage) {
           normalizedImage = normalizeImage(userData.profileImage) || DEFAULT_PROFILE_IMAGE;
@@ -576,7 +569,6 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            /* Login Button for Non-Authenticated Users */
             <div className="mt-4">
               <button
                 className="w-full bg-[#7D0A0A] text-white px-5 py-3 rounded font-semibold hover:bg-[#5A0707] transition-colors duration-200"

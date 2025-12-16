@@ -54,7 +54,6 @@ export default function ChatArea({
   onOpenSidebar,
   onMessageSent,
 }: ChatAreaProps) {
-  // Main state
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [replyingMessage, setReplyingMessage] = useState<Message | null>(null);
@@ -64,7 +63,6 @@ export default function ChatArea({
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
-  // REPORT states
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportTitle, setReportTitle] = useState("");
   const [reportDescription, setReportDescription] = useState("");
@@ -85,21 +83,14 @@ export default function ChatArea({
 
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
 
-  // -------------------------
-  // Socket listeners (combined)
-  // -------------------------
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
-    // -- handle sent message (ack from server)
     const handleSentMessage = (msg: SocketMessage) => {
-      // console.log("🟢 msg-sent EVENT:", { msgId: msg._id, tempId: msg.tempId, from: msg.senderId, to: msg.receiverId });
 
-      // Only process messages for this conversation
       if (msg.receiverId !== conversation.id) return;
 
       setMessages((prev) => {
-        // Replace temp message if tempId exists
         if (msg.tempId) {
           const tempIndex = prev.findIndex((m) => m.id === msg.tempId);
           if (tempIndex !== -1) {
@@ -109,7 +100,6 @@ export default function ChatArea({
           }
         }
 
-        // Avoid duplicates by _id
         const existingIndex = prev.findIndex((m) => m.id === msg._id);
         if (existingIndex !== -1) {
           const updated = [...prev];
@@ -117,7 +107,6 @@ export default function ChatArea({
           return updated;
         }
 
-        // Try to detect optimistic match by comparing last message text & timestamp
         const lastMsg = prev[prev.length - 1];
         const timeDiff = lastMsg
           ? new Date(msg.createdAt || msg.timestamp).getTime() - new Date(lastMsg.timestamp).getTime()
@@ -134,21 +123,16 @@ export default function ChatArea({
           return updated;
         }
 
-        // Else append
         return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
       });
     };
 
-    // -- handle incoming messages (others)
     const handleIncomingMessage = (msg: SocketMessage) => {
-      // console.log("🔵 msg-receive EVENT:", { msgId: msg._id, from: msg.senderId });
 
-      // Ignore if this is my own message (server might emit)
       if (msg.senderId === currentUser._id) {
         return;
       }
 
-      // Validate it's from the conversation partner to me
       const isRelevant = msg.senderId === conversation.id && msg.receiverId === currentUser._id;
       if (!isRelevant) {
         return;
@@ -164,7 +148,6 @@ export default function ChatArea({
       setShouldAutoScroll(true);
     };
 
-    // -- block/unblock events
     const handleUserBlocked = (data: any) => {
       if (data.blockedBy === conversation.id) {
         setBlockStatus((prev) => ({ ...prev, blockedMe: true }));
@@ -179,7 +162,6 @@ export default function ChatArea({
       }
     };
 
-    // -- online/offline
     const handleUserOnline = (userId: string) => {
       if (userId === conversation.id) setConversationOnline(true);
     };
@@ -204,7 +186,6 @@ export default function ChatArea({
     };
   }, [socket, currentUser, conversation]);
 
-  // close active message menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest(".message-bubble")) {
@@ -215,12 +196,10 @@ export default function ChatArea({
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  // autoscroll when messages change
   useEffect(() => {
     if (shouldAutoScroll) scrollToBottom();
   }, [messages, shouldAutoScroll]);
 
-  // when switching conversation quickly scroll instantly
   useEffect(() => {
     if (conversation) {
       setShouldAutoScroll(true);
@@ -228,7 +207,6 @@ export default function ChatArea({
     }
   }, [conversation.id]);
 
-  // Fetch messages for conversation
   useEffect(() => {
     if (!currentUser || !conversation) return;
 
@@ -258,7 +236,6 @@ export default function ChatArea({
     fetchMessages();
   }, [conversation.id, currentUser]);
 
-  // Fetch block status
   useEffect(() => {
     if (!conversation) return;
     const fetchBlockStatus = async () => {
@@ -282,7 +259,6 @@ export default function ChatArea({
     fetchBlockStatus();
   }, [conversation]);
 
-  // Fetch online list to check if conversation partner is online
   useEffect(() => {
     const fetchOnlineStatus = async () => {
       if (!conversation.id) return;
@@ -303,9 +279,6 @@ export default function ChatArea({
     fetchOnlineStatus();
   }, [conversation.id]);
 
-// -------------------------
-// Send message (optimistic UI)
-// -------------------------
 const onSendMessage = async (text: string, files?: File[]) => {
   if (!currentUser || !conversation.id) return;
   if (!text.trim() && (!files || files.length === 0)) return;
@@ -323,7 +296,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
         }))
       : [];
 
-  // ✅ OPTIMISTIC UI
   setMessages((prev) => [
     ...prev,
     {
@@ -340,7 +312,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
 
   scrollToBottom();
 
-  // ✅ SOCKET EMIT (same as before)
   socket.emit("send-msg", {
     tempId,
     from: currentUser._id,
@@ -355,13 +326,11 @@ const onSendMessage = async (text: string, files?: File[]) => {
     formData.append("receiverId", conversation.id);
     formData.append("replyToId", replyingMessage?.id || "");
 
-    // ⭐⭐⭐ FILE API LOGIC ⭐⭐⭐
     if (files && files.length > 0) {
       files.forEach((file) => {
         formData.append("files", file);
       });
 
-      // 🔥 NEW FILE API
       const res = await fetch(
         "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
         {
@@ -376,7 +345,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
       const data = await res.json();
 
       if (data.success) {
-        // replace temp message with backend message
         setMessages((prev) =>
           prev.map((m) =>
             m.id === tempId
@@ -386,7 +354,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
         );
       }
     } else {
-      // 🔥 TEXT MESSAGE API (OLD)
       formData.append("messageText", text);
 
       await fetch(
@@ -407,9 +374,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
   }
 };
 
-  // -------------------------
-  // Block / Unblock / Delete chat
-  // -------------------------
   const handleBlockUser = async () => {
     if (!conversation.id) return;
     try {
@@ -492,7 +456,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
     }
   };
 
-  // delete single message
   const handleDelete = async (msgId: string) => {
     if (msgId.startsWith("temp-"))
       return setMessages((prev) => prev.filter((m) => m.id !== msgId));
@@ -519,15 +482,11 @@ const onSendMessage = async (text: string, files?: File[]) => {
     }
   };
 
-  // reply action
   const handleReply = (msg: Message) => {
     setReplyingMessage(msg);
     setActiveMessageId(null);
   };
 
-  // -------------------------
-  // Report feature
-  // -------------------------
   const handleSubmitReport = async () => {
     if (!reportTitle.trim() || !reportDescription.trim()) {
       alert("Please fill all fields");
@@ -538,7 +497,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
       const token = localStorage.getItem("authToken");
       const formData = new FormData();
 
-      // ⭐ BACKEND REQUIRES "reportedUser" NOT "reportedUserId"
       formData.append("reportedUser", conversation.id);
       formData.append("title", reportTitle);
       formData.append("description", reportDescription);
@@ -574,9 +532,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
     }
   };
 
-  // -------------------------
-  // Utilities
-  // -------------------------
   const formatTime = (timestamp: string) =>
     new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -596,9 +551,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
     }
   };
 
-  // -------------------------
-  // Render
-  // -------------------------
   return (
     <div className="flex flex-col h-full">
       {/* Header */}

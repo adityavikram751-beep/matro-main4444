@@ -1,10 +1,9 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';   // ✅ Correct Badge import
+import { Badge } from '@/components/ui/badge';   
 import Image from 'next/image';
 import { Heart, Star, Apple, Play, MessageCircle } from 'lucide-react';
-// import Footer from '@/components/Footer'; // Footer component
 
 export default function MobileApp() {
   return (
