@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Socket } from "socket.io-client";
 import Image from "next/image";
 import MessageInput from "./MessageInput";
-import { Eye, Download, FileText, MoreVertical, Image as ImageIcon } from "lucide-react";
+import { Eye, Download, FileText, MoreVertical } from "lucide-react";
 import { Conversation, Message, MessageFile, SocketMessage } from "@/types/chat";
 
 interface User {
@@ -40,13 +40,7 @@ function mapSocketToMessage(
       msg.senderId === currentUser._id
         ? currentUser.profileImage || "/my-avatar.png"
         : conversation.avatar,
-    files: msg.files?.map(file => ({
-      ...file,
-      // Convert blob URLs to direct URLs if they're from backend
-      fileUrl: file.fileUrl?.startsWith('blob:') 
-        ? file.fileUrl.replace(/^blob:/, '') 
-        : file.fileUrl
-    })),
+    files: msg.files,
     replyTo: msg.replyTo
       ? mapSocketToMessage(msg.replyTo, currentUser, conversation)
       : undefined,
@@ -89,47 +83,11 @@ export default function ChatArea({
 
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
 
-  // Helper function to convert blob URL to direct URL
-  const convertBlobUrlToDirect = (blobUrl: string): string => {
-    if (!blobUrl) return '';
-    
-    // If it's already a direct URL, return as is
-    if (blobUrl.startsWith('http')) return blobUrl;
-    
-    // If it's a blob URL, try to extract or convert
-    if (blobUrl.startsWith('blob:')) {
-      // Remove blob: prefix
-      const directUrl = blobUrl.replace('blob:', '');
-      
-      // If it looks like a Vercel blob URL, construct proper URL
-      if (directUrl.includes('vercel.app')) {
-        return directUrl;
-      }
-      
-      // For other blob URLs, we'll need to fetch and convert
-      return blobUrl;
-    }
-    
-    return blobUrl;
-  };
-
-  // Helper to safely get file URL
-  const getSafeFileUrl = (file: MessageFile): string => {
-    if (!file.fileUrl) return '';
-    
-    // Check if it's a blob URL
-    if (file.fileUrl.startsWith('blob:')) {
-      // Don't use blob URLs for images in Vercel
-      return ''; // Return empty or placeholder
-    }
-    
-    return file.fileUrl;
-  };
-
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
     const handleSentMessage = (msg: SocketMessage) => {
+
       if (msg.receiverId !== conversation.id) return;
 
       setMessages((prev) => {
@@ -170,6 +128,7 @@ export default function ChatArea({
     };
 
     const handleIncomingMessage = (msg: SocketMessage) => {
+
       if (msg.senderId === currentUser._id) {
         return;
       }
@@ -261,19 +220,9 @@ export default function ChatArea({
         if (!res.ok) throw new Error("Failed to fetch messages");
 
         const data = await res.json();
-        const loadedMessages: Message[] = data.data.map((msg: SocketMessage) => {
-          const mappedMsg = mapSocketToMessage(msg, currentUser, conversation);
-          
-          // Process files to fix blob URLs
-          if (mappedMsg.files) {
-            mappedMsg.files = mappedMsg.files.map(file => ({
-              ...file,
-              fileUrl: convertBlobUrlToDirect(file.fileUrl || '')
-            }));
-          }
-          
-          return mappedMsg;
-        });
+        const loadedMessages: Message[] = data.data.map((msg: SocketMessage) =>
+          mapSocketToMessage(msg, currentUser, conversation)
+        );
 
         setMessages(loadedMessages);
         setIsLoading(false);
@@ -330,101 +279,100 @@ export default function ChatArea({
     fetchOnlineStatus();
   }, [conversation.id]);
 
-  const onSendMessage = async (text: string, files?: File[]) => {
-    if (!currentUser || !conversation.id) return;
-    if (!text.trim() && (!files || files.length === 0)) return;
+const onSendMessage = async (text: string, files?: File[]) => {
+  if (!currentUser || !conversation.id) return;
+  if (!text.trim() && (!files || files.length === 0)) return;
 
-    const token = localStorage.getItem("authToken");
-    const tempId = "temp-" + Date.now();
+  const token = localStorage.getItem("authToken");
+  const tempId = "temp-" + Date.now();
 
-    // For local preview, use object URLs but don't show them in production
-    const localFiles =
-      files?.length
-        ? files.map((file) => ({
-            fileName: file.name,
-            fileUrl: '', // Empty for now, will be updated from backend
-            fileType: file.type,
-            fileSize: file.size,
-          }))
-        : [];
+  const localFiles =
+    files?.length
+      ? files.map((file) => ({
+          fileName: file.name,
+          fileUrl: URL.createObjectURL(file),
+          fileType: file.type,
+          fileSize: file.size,
+        }))
+      : [];
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        senderId: currentUser._id,
-        receiverId: conversation.id,
-        text,
-        timestamp: new Date().toISOString(),
-        sender: "me",
-        avatar: currentUser.profileImage,
-        files: localFiles,
-      },
-    ]);
-
-    scrollToBottom();
-
-    socket.emit("send-msg", {
-      tempId,
-      from: currentUser._id,
-      to: conversation.id,
-      messageText: text,
+  setMessages((prev) => [
+    ...prev,
+    {
+      id: tempId,
+      senderId: currentUser._id,
+      receiverId: conversation.id,
+      text,
+      timestamp: new Date().toISOString(),
+      sender: "me",
+      avatar: currentUser.profileImage,
       files: localFiles,
-      replyToId: replyingMessage?.id || null,
-    });
+    },
+  ]);
 
-    try {
-      const formData = new FormData();
-      formData.append("receiverId", conversation.id);
-      formData.append("replyToId", replyingMessage?.id || "");
+  scrollToBottom();
 
-      if (files && files.length > 0) {
-        files.forEach((file) => {
-          formData.append("files", file);
-        });
+  socket.emit("send-msg", {
+    tempId,
+    from: currentUser._id,
+    to: conversation.id,
+    messageText: text,
+    files: localFiles,
+    replyToId: replyingMessage?.id || null,
+  });
 
-        const res = await fetch(
-          "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-          }
-        );
+  try {
+    const formData = new FormData();
+    formData.append("receiverId", conversation.id);
+    formData.append("replyToId", replyingMessage?.id || "");
 
-        const data = await res.json();
+    if (files && files.length > 0) {
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
 
-        if (data.success) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === tempId
-                ? mapSocketToMessage(data.data, currentUser, conversation)
-                : m
-            )
-          );
+      const res = await fetch(
+        "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         }
-      } else {
-        formData.append("messageText", text);
+      );
 
-        await fetch(
-          "https://matrimonial-backend-7ahc.onrender.com/api/message",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-          }
+      const data = await res.json();
+
+      if (data.success) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? mapSocketToMessage(data.data, currentUser, conversation)
+              : m
+          )
         );
       }
-    } catch (err) {
-      console.error("Send message error:", err);
-    } finally {
-      setReplyingMessage(null);
+    } else {
+      formData.append("messageText", work);
+
+      await fetch(
+        "https://matrimonial-backend-7ahc.onrender.com/api/message",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
     }
-  };
+  } catch (err) {
+    console.error("Send message error:", err);
+  } finally {
+    setReplyingMessage(null);
+  }
+};
 
   const handleBlockUser = async () => {
     if (!conversation.id) return;
@@ -591,60 +539,39 @@ export default function ChatArea({
 
   const handleDownload = async (url: string, name: string) => {
     try {
-      // If it's a blob URL, fetch it first
-      if (url.startsWith('blob:')) {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      } else {
-        // Regular URL
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = name;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
     } catch (err) {
       console.error("Download error:", err);
-      alert("Failed to download file");
     }
-  };
-
-  // Function to check if URL is safe for img tag
-  const isSafeForImgTag = (url: string): boolean => {
-    if (!url) return false;
-    return url.startsWith('http') || url.startsWith('data:');
   };
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between relative
-                   max-md:fixed max-md:top-[56px] max-md:left-0 max-md:right-0 max-md:z-40"
-      >
-        <button onClick={onOpenSidebar} className="md:hidden">☰</button>
+<div
+  className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between relative
+             max-md:fixed max-md:top-[56px] max-md:left-0 max-md:right-0 max-md:z-40"
+>
+  <button onClick={onOpenSidebar} className="md:hidden">☰</button>
 
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            {conversation.avatar ? (
-              <Image
-                src={conversation.avatar}
-                alt={conversation.name}
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full object-cover"
-                unoptimized
-              />
+  <div className="flex items-center space-x-3">
+    <div className="relative">
+      {conversation.avatar ? (
+        <Image
+          src={conversation.avatar}
+          alt={conversation.name}
+          width={48}
+          height={48}
+          className="w-12 h-12 rounded-full object-cover"
+        />
+      
+
             ) : (
               <div className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center">
                 {conversation.name?.charAt(0).toUpperCase()}
@@ -664,7 +591,7 @@ export default function ChatArea({
 
         <div className="relative">
           <button
-            onClick={() => setHeaderMenuOpen((prev) => !prev)}
+            onClick={() => setHeaderMenuOpen((next) => !next)}
             className="p-2 rounded-full hover:bg-gray-100"
           >
             <MoreVertical size={20} />
@@ -676,10 +603,11 @@ export default function ChatArea({
               bg-white shadow-xl rounded-xl border 
               z-50 overflow-hidden
             ">
+              {/* REPORT */}
               <button
                 onClick={() => {
-                  setIsReportOpen(true);
-                  setHeaderMenuOpen(false);
+                  setIsReportOpen(false);
+                  setHeaderMenuOpen(true);
                 }}
                 className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
               >
@@ -810,91 +738,34 @@ export default function ChatArea({
 
                   {msg.files && msg.files.length > 0 && (
                     <div className="space-y-2 mt-2">
-                      {msg.files.map((file, i) => {
-                        const safeUrl = getSafeFileUrl(file);
-                        const canShowImage = isImage(file.fileType) && isSafeForImgTag(safeUrl);
-                        
-                        return (
-                          <div key={i} className="border rounded-lg overflow-hidden relative">
-                            {isImage(file.fileType) ? (
-                              canShowImage ? (
-                                <img
-                                  src={safeUrl}
-                                  alt={file.fileName}
-                                  className="w-full h-auto max-h-40 object-cover cursor-pointer"
-                                  onClick={() => {
-                                    if (safeUrl) {
-                                      window.open(safeUrl, "_blank");
-                                    }
-                                  }}
-                                  onError={(e) => {
-                                    // Replace with icon on error
-                                    e.currentTarget.style.display = 'none';
-                                    const parent = e.currentTarget.parentElement;
-                                    if (parent) {
-                                      const iconDiv = document.createElement('div');
-                                      iconDiv.className = 'w-full h-40 flex items-center justify-center bg-gray-100';
-                                      iconDiv.innerHTML = '<div class="text-center"><ImageIcon size={48} class="text-gray-400 mx-auto" /><p class="text-sm text-gray-500 mt-2">Image not available</p></div>';
-                                      parent.appendChild(iconDiv);
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <div className="w-full h-40 flex items-center justify-center bg-gray-100 cursor-pointer" 
-                                     onClick={() => {
-                                       if (file.fileUrl) {
-                                         handleDownload(file.fileUrl, file.fileName);
-                                       }
-                                     }}>
-                                  <div className="text-center">
-                                    <ImageIcon size={48} className="text-gray-400 mx-auto" />
-                                    <p className="text-sm text-gray-500 mt-2">Click to download image</p>
-                                    <p className="text-xs text-gray-400">{file.fileName}</p>
-                                  </div>
-                                </div>
-                              )
-                            ) : (
-                              <div className="flex items-center gap-3 p-2 bg-gray-50">
-                                <FileText size={20} className="text-gray-600" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{file.fileName}</p>
-                                  <p className="text-xs text-gray-500">{(file.fileSize / 1024).toFixed(1)} KB</p>
-                                </div>
-                                <div className="flex gap-1">
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (file.fileUrl) {
-                                        handleDownload(file.fileUrl, file.fileName);
-                                      }
-                                    }}
-                                    className="p-1 hover:bg-gray-200 rounded"
-                                  >
-                                    <Eye size={14} />
-                                  </button>
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (file.fileUrl) {
-                                        handleDownload(file.fileUrl, file.fileName);
-                                      }
-                                    }}
-                                    className="p-1 hover:bg-gray-200 rounded"
-                                  >
-                                    <Download size={14} />
-                                  </button>
-                                </div>
+                      {msg.files.map((file, i) => (
+                        <div key={i} className="border rounded-lg overflow-hidden relative">
+                          {isImage(file.fileType) ? (
+                            <img
+                              src={file.fileUrl}
+                              alt={file.fileName}
+                              className="w-full h-auto max-h-40 object-cover cursor-pointer"
+                              onClick={() => window.open(file.fileUrl, "_blank")}
+                            />
+                          ) : (
+                            <div className="flex items-center gap-3 p-2 bg-gray-50">
+                              <FileText size={20} className="text-gray-600" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{file.fileName}</p>
+                                <p className="text-xs text-gray-500">{(file.fileSize / 1024).toFixed(1)} KB</p>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                              <div className="flex gap-1">
+                                <button onClick={() => window.open(file.fileUrl, "_blank")}><Eye size={14} /></button>
+                                <button onClick={() => handleDownload(file.fileUrl, file.fileName)}><Download size={14} /></button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  <p className={`text-xs mt-1 ${isMe ? "text-indigo-200" : "text-gray-500"}`}>
-                    {formatTime(msg.timestamp)}
-                  </p>
+                  <p className="text-xs mt-1 text-gray-300">{formatTime(msg.timestamp)}</p>
 
                   {activeMessageId === msg.id && (
                     <div className="absolute top-0 right-0 bg-white border shadow-lg rounded-md text-sm z-50 flex flex-col overflow-hidden">
@@ -968,7 +839,7 @@ export default function ChatArea({
             ? { text: replyingMessage.text || "", id: replyingMessage.id }
             : undefined
         }
-        onCancelReply={() => setReplyingMessage(null)}
+        onCancelReply={() => setReplyingMessage(true)}
         disabled={blockStatus.blockedMe || blockStatus.iBlocked}
         socket={socket}
         currentUser={currentUser}
