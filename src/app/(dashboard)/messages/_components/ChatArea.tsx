@@ -1,19 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Socket } from "socket.io-client";
 import Image from "next/image";
 import MessageInput from "./MessageInput";
-import { Eye, Download, FileText, MoreVertical, Check, CheckCheck, Clock, AlertCircle } from "lucide-react";
-import { Conversation, Message, SocketMessage, MessageStatus } from "@/types/chat";
+import { Eye, Download, FileText, MoreVertical } from "lucide-react";
+import { Conversation, Message, SocketMessage } from "@/types/chat";
 
 interface User {
   _id: string;
   firstName: string;
   lastName: string;
   profileImage?: string;
-  onlineStatus?: "online" | "offline";
-  lastSeen?: string;
 }
 
 interface ChatAreaProps {
@@ -23,26 +21,6 @@ interface ChatAreaProps {
   onOpenSidebar: () => void;
 }
 
-// Constants
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://matrimonial-backend-7ahc.onrender.com";
-const SOCKET_EVENTS = {
-  MSG_SENT: "msg-sent",
-  MSG_RECEIVE: "msg-receive",
-  USER_TYPING: "user-typing",
-  USER_STOP_TYPING: "user-stop-typing",
-  USER_ONLINE: "user-online",
-  USER_OFFLINE: "user-offline",
-  USER_BLOCKED: "user-blocked",
-  USER_UNBLOCKED: "user-unblocked",
-  MESSAGE_DELIVERED: "message-delivered",
-  MESSAGE_READ: "message-read",
-  MESSAGE_DELETED: "message-deleted",
-  CHAT_DELETED: "chat-deleted",
-  ERROR: "error",
-  ONLINE_USERS_UPDATE: "online-users-update",
-  USER_ADDED: "user-added"
-} as const;
-
 function mapSocketToMessage(
   msg: SocketMessage,
   currentUser: User,
@@ -50,30 +28,22 @@ function mapSocketToMessage(
 ): Message {
   return {
     id: msg._id || msg.tempId || `msg-${Date.now()}`,
-    _id: msg._id,
     senderId: msg.senderId,
     receiverId: msg.receiverId,
     text: msg.messageText || "",
     timestamp: msg.createdAt || new Date().toISOString(),
-    createdAt: msg.createdAt || new Date().toISOString(),
     sender: msg.senderId === currentUser._id ? "me" : "other",
-    avatar: 
+    avatar:
       msg.senderId === currentUser._id
         ? currentUser.profileImage || "/my-avatar.png"
         : conversation.avatar,
     files: msg.files || [],
     replyTo: msg.replyTo
-      ? {
-          id: msg.replyTo._id,
-          text: msg.replyTo.messageText || "",
-          files: msg.replyTo.files || []
-        }
+      ? mapSocketToMessage(msg.replyTo, currentUser, conversation)
       : undefined,
-    status: (msg.status as MessageStatus) || "sent",
+    status: msg.status || "sent",
     deliveredAt: msg.deliveredAt,
-    readAt: msg.readAt,
-    conversationId: msg.conversationId,
-    tempId: msg.tempId
+    readAt: msg.readAt
   };
 }
 
@@ -93,10 +63,6 @@ export default function ChatArea({
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [conversationLastSeen, setConversationLastSeen] = useState<string | null>(null);
 
   // REPORT states
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -107,67 +73,56 @@ export default function ChatArea({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
-  const observerRef = useRef<IntersectionObserver>();
-  const messagePageRef = useRef(0);
-  const MESSAGES_PER_PAGE = 50;
+  const hasFetchedMessagesRef = useRef(false);
 
-  // Memoized values
-  const conversationId = useMemo(() => 
-    conversation.id ? [currentUser?._id, conversation.id].sort().join("_") : "",
-    [currentUser?._id, conversation.id]
-  );
-
-  const currentUserId = currentUser?._id;
-
-  // Helper functions
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior });
-  }, []);
+  };
 
-  const isAtBottom = useCallback(() => {
+  const isAtBottom = () => {
     if (!messagesContainerRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     return scrollTop + clientHeight >= scrollHeight - 100;
-  }, []);
-
-  const handleScroll = () => {
-    setShouldAutoScroll(isAtBottom());
-    
-    // Load more messages when scrolled to top
-    if (messagesContainerRef.current?.scrollTop === 0 && hasMoreMessages && !isLoadingMore) {
-      loadMoreMessages();
-    }
   };
 
-  // Socket setup with backend alignment
+  const handleScroll = () => setShouldAutoScroll(isAtBottom());
+
+  // -------------------------
+  // SOCKET SETUP - REAL-TIME
+  // -------------------------
   useEffect(() => {
-    if (!socket || !currentUserId || !conversation.id) return;
+    if (!socket || !currentUser || !conversation) return;
 
     console.log("🔄 Setting up socket for conversation:", conversation.id);
 
-    // 1. Join user to socket (matches backend "add-user")
-    socket.emit("add-user", currentUserId);
+    // 1. Join user to socket
+    socket.emit("add-user", currentUser._id);
 
-    // Socket event handlers
+    // 2. Handle MESSAGE SENT (when backend confirms)
     const handleSentMessage = (socketMsg: SocketMessage) => {
       console.log("✅ Backend confirmed message sent:", socketMsg);
       
-      if (![socketMsg.senderId, socketMsg.receiverId].includes(conversation.id)) return;
+      // Only process if it's for current conversation
+      const isRelevant = 
+        (socketMsg.senderId === currentUser._id && socketMsg.receiverId === conversation.id) ||
+        (socketMsg.senderId === conversation.id && socketMsg.receiverId === currentUser._id);
+      
+      if (!isRelevant) return;
 
       setMessages(prev => {
-        // Replace temp message
+        // Replace temp message with real one
         if (socketMsg.tempId) {
           const tempIndex = prev.findIndex(m => m.id === socketMsg.tempId);
           if (tempIndex !== -1) {
             const newMessages = [...prev];
-            newMessages[tempIndex] = mapSocketToMessage(socketMsg, currentUser!, conversation);
+            newMessages[tempIndex] = mapSocketToMessage(socketMsg, currentUser, conversation);
             return newMessages;
           }
         }
         
-        // Add if not exists
+        // Add new message if not exists
         if (!prev.some(m => m._id === socketMsg._id)) {
-          return [...prev, mapSocketToMessage(socketMsg, currentUser!, conversation)];
+          return [...prev, mapSocketToMessage(socketMsg, currentUser, conversation)];
         }
         
         return prev;
@@ -176,157 +131,117 @@ export default function ChatArea({
       setShouldAutoScroll(true);
     };
 
+    // 3. Handle INCOMING MESSAGE (from other user)
     const handleIncomingMessage = (socketMsg: SocketMessage) => {
-      console.log("📩 Incoming message:", socketMsg);
+      console.log("📩 Incoming message from socket:", socketMsg);
       
-      if (socketMsg.receiverId === currentUserId && socketMsg.senderId === conversation.id) {
+      // Check if message is for me
+      if (socketMsg.receiverId === currentUser._id && socketMsg.senderId === conversation.id) {
         setMessages(prev => {
-          if (prev.some(m => m._id === socketMsg._id)) return prev;
-          return [...prev, mapSocketToMessage(socketMsg, currentUser!, conversation)];
+          // Avoid duplicates
+          if (prev.some(m => m.id === socketMsg._id || m.id === socketMsg.tempId)) {
+            return prev;
+          }
+          return [...prev, mapSocketToMessage(socketMsg, currentUser, conversation)];
         });
         setShouldAutoScroll(true);
-        
-        // Mark as delivered automatically (backend does this for online users)
-        if (socketMsg.status !== "delivered") {
-          socket.emit("message-delivered", {
-            messageId: socketMsg._id,
-            conversationId: socketMsg.conversationId,
-            deliveredAt: new Date()
-          });
-        }
       }
     };
 
-    const handleUserTyping = (data: { from: string }) => {
+    // 4. Handle TYPING
+    const handleUserTyping = (data: any) => {
       if (data.from === conversation.id) {
         setIsTyping(true);
       }
     };
 
-    const handleUserStopTyping = (data: { from: string }) => {
+    const handleUserStopTyping = (data: any) => {
       if (data.from === conversation.id) {
         setIsTyping(false);
       }
     };
 
+    // 5. Handle ONLINE/OFFLINE
     const handleUserOnline = (userId: string) => {
-      if (userId === conversation.id) {
-        setConversationOnline(true);
-        setConversationLastSeen(null);
-      }
+      if (userId === conversation.id) setConversationOnline(true);
     };
 
     const handleUserOffline = (userId: string) => {
-      if (userId === conversation.id) {
-        setConversationOnline(false);
-        // Fetch last seen from API
-        fetchLastSeen();
-      }
+      if (userId === conversation.id) setConversationOnline(false);
     };
 
-    const handleUserBlocked = (data: { blockedBy: string }) => {
+    // 6. Handle BLOCK/UNBLOCK
+    const handleUserBlocked = (data: any) => {
       if (data.blockedBy === conversation.id) {
         setBlockStatus(prev => ({ ...prev, blockedMe: true }));
       }
     };
 
-    const handleUserUnblocked = (data: { unblockedBy: string }) => {
+    const handleUserUnblocked = (data: any) => {
       if (data.unblockedBy === conversation.id) {
         setBlockStatus(prev => ({ ...prev, blockedMe: false }));
       }
     };
 
-    const handleMessageDelivered = (data: { messageId: string; deliveredAt: string }) => {
+    // 7. Handle MESSAGE STATUS UPDATES
+    const handleMessageDelivered = (data: any) => {
       setMessages(prev =>
         prev.map(msg =>
-          msg._id === data.messageId
+          msg.id === data.messageId
             ? { ...msg, status: "delivered", deliveredAt: data.deliveredAt }
             : msg
         )
       );
     };
 
-    const handleMessageRead = (data: { conversationId: string; readerId: string }) => {
-      if (data.conversationId === conversationId) {
-        // Mark all messages sent by current user as read
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.senderId === currentUserId && msg.status !== "read"
-              ? { ...msg, status: "read", readAt: new Date().toISOString() }
-              : msg
-          )
-        );
-      }
+    const handleMessageRead = (data: any) => {
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.senderId === currentUser._id && msg.status !== "read"
+            ? { ...msg, status: "read", readAt: data.readAt }
+            : msg
+        )
+      );
     };
 
-    const handleMessageDeleted = (data: { messageId: string }) => {
-      setMessages(prev => prev.filter(msg => msg._id !== data.messageId));
+    // 8. Handle DELETE
+    const handleMessageDeleted = (data: any) => {
+      setMessages(prev => prev.filter(msg => msg.id !== data.messageId));
     };
 
-    const handleChatDeleted = (data: { conversationId: string }) => {
-      if (data.conversationId === conversationId) {
-        setMessages([]);
-        alert("Chat was deleted by the other user");
-      }
-    };
+    // 9. Register all listeners
+    socket.on("msg-sent", handleSentMessage);
+    socket.on("msg-receive", handleIncomingMessage);
+    socket.on("user-typing", handleUserTyping);
+    socket.on("user-stop-typing", handleUserStopTyping);
+    socket.on("user-online", handleUserOnline);
+    socket.on("user-offline", handleUserOffline);
+    socket.on("user-blocked", handleUserBlocked);
+    socket.on("user-unblocked", handleUserUnblocked);
+    socket.on("message-delivered", handleMessageDelivered);
+    socket.on("message-read", handleMessageRead);
+    socket.on("message-deleted", handleMessageDeleted);
 
-    const handleOnlineUsersUpdate = (userIds: string[]) => {
-      setOnlineUsers(userIds);
-      setConversationOnline(userIds.includes(conversation.id));
-    };
-
-    const handleUserAdded = (data: { userId: string; onlineUsers: string[] }) => {
-      if (data.userId === currentUserId) {
-        setOnlineUsers(data.onlineUsers);
-        setConversationOnline(data.onlineUsers.includes(conversation.id));
-      }
-    };
-
-    const handleSocketError = (error: { message: string }) => {
-      console.error("Socket error:", error);
-      // Show user-friendly error
-    };
-
-    // Register all socket listeners
-    socket.on(SOCKET_EVENTS.MSG_SENT, handleSentMessage);
-    socket.on(SOCKET_EVENTS.MSG_RECEIVE, handleIncomingMessage);
-    socket.on(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
-    socket.on(SOCKET_EVENTS.USER_STOP_TYPING, handleUserStopTyping);
-    socket.on(SOCKET_EVENTS.USER_ONLINE, handleUserOnline);
-    socket.on(SOCKET_EVENTS.USER_OFFLINE, handleUserOffline);
-    socket.on(SOCKET_EVENTS.USER_BLOCKED, handleUserBlocked);
-    socket.on(SOCKET_EVENTS.USER_UNBLOCKED, handleUserUnblocked);
-    socket.on(SOCKET_EVENTS.MESSAGE_DELIVERED, handleMessageDelivered);
-    socket.on(SOCKET_EVENTS.MESSAGE_READ, handleMessageRead);
-    socket.on(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
-    socket.on(SOCKET_EVENTS.CHAT_DELETED, handleChatDeleted);
-    socket.on(SOCKET_EVENTS.ONLINE_USERS_UPDATE, handleOnlineUsersUpdate);
-    socket.on(SOCKET_EVENTS.USER_ADDED, handleUserAdded);
-    socket.on(SOCKET_EVENTS.ERROR, handleSocketError);
-
-    // Cleanup
     return () => {
-      socket.off(SOCKET_EVENTS.MSG_SENT, handleSentMessage);
-      socket.off(SOCKET_EVENTS.MSG_RECEIVE, handleIncomingMessage);
-      socket.off(SOCKET_EVENTS.USER_TYPING, handleUserTyping);
-      socket.off(SOCKET_EVENTS.USER_STOP_TYPING, handleUserStopTyping);
-      socket.off(SOCKET_EVENTS.USER_ONLINE, handleUserOnline);
-      socket.off(SOCKET_EVENTS.USER_OFFLINE, handleUserOffline);
-      socket.off(SOCKET_EVENTS.USER_BLOCKED, handleUserBlocked);
-      socket.off(SOCKET_EVENTS.USER_UNBLOCKED, handleUserUnblocked);
-      socket.off(SOCKET_EVENTS.MESSAGE_DELIVERED, handleMessageDelivered);
-      socket.off(SOCKET_EVENTS.MESSAGE_READ, handleMessageRead);
-      socket.off(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
-      socket.off(SOCKET_EVENTS.CHAT_DELETED, handleChatDeleted);
-      socket.off(SOCKET_EVENTS.ONLINE_USERS_UPDATE, handleOnlineUsersUpdate);
-      socket.off(SOCKET_EVENTS.USER_ADDED, handleUserAdded);
-      socket.off(SOCKET_EVENTS.ERROR, handleSocketError);
+      socket.off("msg-sent", handleSentMessage);
+      socket.off("msg-receive", handleIncomingMessage);
+      socket.off("user-typing", handleUserTyping);
+      socket.off("user-stop-typing", handleUserStopTyping);
+      socket.off("user-online", handleUserOnline);
+      socket.off("user-offline", handleUserOffline);
+      socket.off("user-blocked", handleUserBlocked);
+      socket.off("user-unblocked", handleUserUnblocked);
+      socket.off("message-delivered", handleMessageDelivered);
+      socket.off("message-read", handleMessageRead);
+      socket.off("message-deleted", handleMessageDeleted);
     };
-  }, [socket, currentUser, conversation.id, currentUserId, conversationId]);
+  }, [socket, currentUser, conversation]);
 
-  // Fetch initial messages
+  // -------------------------
+  // INITIAL MESSAGES FETCH
+  // -------------------------
   useEffect(() => {
-    if (!currentUserId || !conversation.id) return;
+    if (!currentUser || !conversation || hasFetchedMessagesRef.current) return;
 
     const fetchMessages = async () => {
       try {
@@ -334,7 +249,7 @@ export default function ChatArea({
         const token = localStorage.getItem("authToken");
         
         const res = await fetch(
-          `${API_BASE_URL}/api/message?currentUserId=${conversation.id}&limit=${MESSAGES_PER_PAGE}&skip=0`,
+          `https://matrimonial-backend-7ahc.onrender.com/api/message?currentUserId=${conversation.id}`,
           { 
             headers: { 
               Authorization: `Bearer ${token}` 
@@ -346,16 +261,10 @@ export default function ChatArea({
         
         if (data.success && Array.isArray(data.data)) {
           const loadedMessages = data.data.map((msg: SocketMessage) =>
-            mapSocketToMessage(msg, currentUser!, conversation)
+            mapSocketToMessage(msg, currentUser, conversation)
           );
           setMessages(loadedMessages);
-          setHasMoreMessages(data.data.length === MESSAGES_PER_PAGE);
-          messagePageRef.current = 1;
-          
-          // Mark messages as read
-          if (loadedMessages.length > 0) {
-            markMessagesAsRead();
-          }
+          hasFetchedMessagesRef.current = true;
         }
       } catch (err) {
         console.error("Failed to fetch messages:", err);
@@ -365,132 +274,16 @@ export default function ChatArea({
     };
 
     fetchMessages();
-  }, [conversation.id, currentUserId, currentUser, conversation]);
+  }, [conversation.id, currentUser]);
 
-  // Fetch more messages (infinite scroll)
-  const loadMoreMessages = async () => {
-    if (isLoadingMore || !hasMoreMessages || !currentUserId || !conversation.id) return;
-
-    try {
-      setIsLoadingMore(true);
-      const token = localStorage.getItem("authToken");
-      const skip = messagePageRef.current * MESSAGES_PER_PAGE;
-      
-      const res = await fetch(
-        `${API_BASE_URL}/api/message?currentUserId=${conversation.id}&limit=${MESSAGES_PER_PAGE}&skip=${skip}`,
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}` 
-          } 
-        }
-      );
-      
-      const data = await res.json();
-      
-      if (data.success && Array.isArray(data.data)) {
-        const newMessages = data.data.map((msg: SocketMessage) =>
-          mapSocketToMessage(msg, currentUser!, conversation)
-        );
-        
-        setMessages(prev => [...newMessages, ...prev]);
-        setHasMoreMessages(data.data.length === MESSAGES_PER_PAGE);
-        messagePageRef.current += 1;
-      }
-    } catch (err) {
-      console.error("Failed to load more messages:", err);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
-  // Fetch last seen information
-  const fetchLastSeen = async () => {
-    try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(
-        `${API_BASE_URL}/api/message/online?userId=${conversation.id}`,
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}` 
-          } 
-        }
-      );
-      
-      const data = await res.json();
-      if (data.success) {
-        setConversationLastSeen(data.lastSeen);
-      }
-    } catch (err) {
-      console.error("Failed to fetch last seen:", err);
-    }
-  };
-
-  // Check block status
+  // Reset fetch flag when conversation changes
   useEffect(() => {
-    const checkBlockStatus = async () => {
-      try {
-        const token = localStorage.getItem("authToken");
-        const res = await fetch(
-          `${API_BASE_URL}/api/message/isBlocked/${conversation.id}`,
-          { 
-            headers: { 
-              Authorization: `Bearer ${token}` 
-            } 
-          }
-        );
-        
-        const data = await res.json();
-        if (data.success) {
-          setBlockStatus({
-            iBlocked: data.iBlocked || false,
-            blockedMe: data.blockedMe || false
-          });
-        }
-      } catch (err) {
-        console.error("Failed to check block status:", err);
-      }
-    };
+    hasFetchedMessagesRef.current = false;
+  }, [conversation.id]);
 
-    if (conversation.id && currentUserId) {
-      checkBlockStatus();
-    }
-  }, [conversation.id, currentUserId]);
-
-  // Mark messages as read
-  const markMessagesAsRead = async () => {
-    try {
-      const token = localStorage.getItem("authToken");
-      await fetch(`${API_BASE_URL}/api/message/markAsRead`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ 
-          conversationId,
-          otherUserId: conversation.id 
-        }),
-      });
-
-      // Also emit socket event for real-time update
-      socket.emit("message-read-ack", {
-        conversationId,
-        readerId: currentUserId,
-        otherUserId: conversation.id
-      });
-    } catch (err) {
-      console.error("Failed to mark messages as read:", err);
-    }
-  };
-
-  // Auto-scroll effect
-  useEffect(() => {
-    if (shouldAutoScroll && messages.length > 0) {
-      scrollToBottom();
-    }
-  }, [messages, shouldAutoScroll, scrollToBottom]);
-
-  // Message sending with backend alignment
+  // -------------------------
+  // SEND MESSAGE - OPTIMISTIC UI
+  // -------------------------
   const onSendMessage = async (text: string, files?: File[]) => {
     if (!currentUser || !conversation.id || !socket) {
       alert("Cannot send message");
@@ -502,18 +295,18 @@ export default function ChatArea({
       return;
     }
 
+    console.log("📤 Sending message:", { text, filesCount: files?.length || 0 });
+
     const token = localStorage.getItem("authToken");
     const tempId = `temp-${Date.now()}`;
 
-    // Optimistic message
+    // 1. IMMEDIATE UI UPDATE (Optimistic)
     const optimisticMessage: Message = {
       id: tempId,
-      _id: tempId,
       senderId: currentUser._id,
       receiverId: conversation.id,
       text: text.trim(),
       timestamp: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
       sender: "me",
       avatar: currentUser.profileImage,
       files: files?.map(file => ({
@@ -523,26 +316,33 @@ export default function ChatArea({
         fileSize: file.size,
       })) || [],
       status: "sending",
-      replyTo: replyingMessage ? {
-        id: replyingMessage._id || replyingMessage.id,
-        text: replyingMessage.text || "",
-        files: replyingMessage.files || []
-      } : undefined,
-      conversationId
+      replyTo: replyingMessage || undefined
     };
 
+    console.log("➕ Adding optimistic message to UI");
     setMessages(prev => [...prev, optimisticMessage]);
     scrollToBottom();
     setReplyingMessage(null);
 
     try {
-      // Use socket for text messages (matches backend)
+      // 2. SEND VIA SOCKET (Real-time)
+      socket.emit("send-msg", {
+        tempId,
+        from: currentUser._id,
+        to: conversation.id,
+        messageText: text.trim(),
+        replyToId: replyingMessage?.id || null,
+      });
+
+      console.log("📡 Socket emit done");
+
+      // 3. SAVE TO DATABASE
       if (files && files.length > 0) {
-        // Handle file upload via API
+        // FILE MESSAGE
         const formData = new FormData();
         formData.append("receiverId", conversation.id);
         if (replyingMessage?.id) {
-          formData.append("replyToId", replyingMessage.id.replace('temp-', ''));
+          formData.append("replyToId", replyingMessage.id);
         }
         
         files.forEach((file) => {
@@ -550,7 +350,7 @@ export default function ChatArea({
         });
 
         const res = await fetch(
-          `${API_BASE_URL}/api/message/send-file`,
+          "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
           {
             method: "POST",
             headers: {
@@ -564,6 +364,7 @@ export default function ChatArea({
         console.log("📁 File upload response:", data);
 
         if (!data.success) {
+          // Mark as failed if backend error
           setMessages(prev =>
             prev.map(msg =>
               msg.id === tempId ? { ...msg, status: "failed" } : msg
@@ -571,16 +372,35 @@ export default function ChatArea({
           );
         }
       } else {
-        // Send text message via socket (backend expects this)
-        socket.emit("send-msg", {
-          tempId,
-          from: currentUser._id,
-          to: conversation.id,
-          messageText: text.trim(),
-          replyToId: replyingMessage?.id?.replace('temp-', '') || null,
-        });
+        // TEXT MESSAGE
+        const formData = new FormData();
+        formData.append("receiverId", conversation.id);
+        formData.append("messageText", text.trim());
+        if (replyingMessage?.id) {
+          formData.append("replyToId", replyingMessage.id);
+        }
 
-        console.log("📡 Socket emit done for text message");
+        const res = await fetch(
+          "https://matrimonial-backend-7ahc.onrender.com/api/message",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          }
+        );
+
+        const data = await res.json();
+        console.log("📝 Text message response:", data);
+
+        if (!data.success) {
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === tempId ? { ...msg, status: "failed" } : msg
+            )
+          );
+        }
       }
     } catch (err) {
       console.error("❌ Send message error:", err);
@@ -592,12 +412,14 @@ export default function ChatArea({
     }
   };
 
-  // Typing indicator
+  // -------------------------
+  // TYPING INDICATOR
+  // -------------------------
   const handleTyping = () => {
-    if (!socket || !currentUserId || !conversation.id) return;
+    if (!socket || !currentUser || !conversation.id) return;
 
     socket.emit("typing", {
-      from: currentUserId,
+      from: currentUser._id,
       to: conversation.id
     });
 
@@ -607,19 +429,21 @@ export default function ChatArea({
 
     typingTimeoutRef.current = setTimeout(() => {
       socket.emit("stop-typing", {
-        from: currentUserId,
+        from: currentUser._id,
         to: conversation.id
       });
     }, 2000);
   };
 
-  // Block/Unblock user
+  // -------------------------
+  // BLOCK/UNBLOCK
+  // -------------------------
   const handleBlockUser = async () => {
     if (!conversation.id) return;
     try {
       const token = localStorage.getItem("authToken");
       const res = await fetch(
-        `${API_BASE_URL}/api/message/block`,
+        `https://matrimonial-backend-7ahc.onrender.com/api/message/block`,
         {
           method: "POST",
           headers: {
@@ -629,18 +453,15 @@ export default function ChatArea({
           body: JSON.stringify({ otherUserId: conversation.id }),
         }
       );
+      if (!res.ok) throw new Error("Failed to block user");
       
-      if (res.ok) {
-        setBlockStatus({ iBlocked: true, blockedMe: false });
-        setHeaderMenuOpen(false);
-        
-        socket.emit("block-user", {
-          blockerId: currentUserId,
-          blockedId: conversation.id
-        });
-      } else {
-        throw new Error("Failed to block user");
-      }
+      setBlockStatus({ iBlocked: true, blockedMe: false });
+      setHeaderMenuOpen(false);
+      
+      socket.emit("block-user", {
+        blockerId: currentUser?._id,
+        blockedId: conversation.id
+      });
     } catch (err: any) {
       console.error(err);
       alert(`Error: ${err.message}`);
@@ -652,7 +473,7 @@ export default function ChatArea({
     try {
       const token = localStorage.getItem("authToken");
       const res = await fetch(
-        `${API_BASE_URL}/api/message/unblock`,
+        `https://matrimonial-backend-7ahc.onrender.com/api/message/unblock`,
         {
           method: "POST",
           headers: {
@@ -662,17 +483,45 @@ export default function ChatArea({
           body: JSON.stringify({ otherUserId: conversation.id }),
         }
       );
+      if (!res.ok) throw new Error("Failed to unblock user");
       
-      if (res.ok) {
-        setBlockStatus({ iBlocked: false, blockedMe: false });
-        setHeaderMenuOpen(false);
+      setBlockStatus({ iBlocked: false, blockedMe: false });
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  // -------------------------
+  // DELETE MESSAGE
+  // -------------------------
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!msgId.startsWith("temp-")) {
+      if (!confirm("Delete this message?")) return;
+    }
+
+    try {
+      setMessages(prev => prev.filter(m => m.id !== msgId));
+      setActiveMessageId(null);
+
+      if (!msgId.startsWith("temp-")) {
+        const token = localStorage.getItem("authToken");
+        const res = await fetch(
+          `https://matrimonial-backend-7ahc.onrender.com/api/message/delete/message`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ messageId: msgId }),
+          }
+        );
         
-        socket.emit("unblock-user", {
-          unblockerId: currentUserId,
-          unblockedId: conversation.id
+        socket.emit("delete-message", {
+          messageId: msgId,
+          deletedBy: currentUser?._id
         });
-      } else {
-        throw new Error("Failed to unblock user");
       }
     } catch (err: any) {
       console.error(err);
@@ -680,81 +529,11 @@ export default function ChatArea({
     }
   };
 
-  // Delete message
-  const handleDeleteMessage = async (msgId: string) => {
-    if (msgId.startsWith("temp-")) {
-      setMessages(prev => prev.filter(m => m.id !== msgId));
-      setActiveMessageId(null);
-      return;
-    }
-
-    if (!confirm("Delete this message?")) return;
-
-    try {
-      const token = localStorage.getItem("authToken");
-      await fetch(
-        `${API_BASE_URL}/api/message/delete/message`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ messageId: msgId }),
-        }
-      );
-      
-      setMessages(prev => prev.filter(m => m.id !== msgId));
-      setActiveMessageId(null);
-
-      socket.emit("delete-message", {
-        messageId: msgId,
-        deletedBy: currentUserId
-      });
-    } catch (err: any) {
-      console.error(err);
-      alert(`Error: ${err.message}`);
-    }
-  };
-
-  // Delete entire chat
-  const handleDeleteChat = async () => {
-    if (!confirm("Delete entire chat? This action cannot be undone.")) return;
-
-    try {
-      const token = localStorage.getItem("authToken");
-      await fetch(
-        `${API_BASE_URL}/api/message/delete/chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ conversationId }),
-        }
-      );
-      
-      setMessages([]);
-      setHeaderMenuOpen(false);
-
-      socket.emit("delete-chat", {
-        conversationId,
-        deletedBy: currentUserId,
-        otherUserId: conversation.id
-      });
-    } catch (err: any) {
-      console.error(err);
-      alert(`Error: ${err.message}`);
-    }
-  };
-
-  // Helper functions
+  // -------------------------
+  // UI UTILITIES
+  // -------------------------
   const formatTime = (timestamp: string) =>
     new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-  const formatDate = (timestamp: string) =>
-    new Date(timestamp).toLocaleDateString();
 
   const isImage = (fileType: string) => fileType.startsWith("image/");
 
@@ -769,70 +548,31 @@ export default function ChatArea({
       URL.revokeObjectURL(a.href);
     } catch (err) {
       console.error("Download error:", err);
-      alert("Failed to download file");
     }
   };
 
   const getStatusIcon = (msg: Message) => {
-    switch (msg.status) {
-      case "failed":
-        return <AlertCircle size={14} className="text-red-500" />;
-      case "sending":
-        return <Clock size={14} className="text-gray-400" />;
-      case "delivered":
-        return <CheckCheck size={14} className="text-gray-500" />;
-      case "read":
-        return <CheckCheck size={14} className="text-blue-500" />;
-      default:
-        return <Check size={14} className="text-gray-400" />;
-    }
+    if (msg.status === "failed") return "❌";
+    if (msg.status === "sending") return "🔄";
+    if (msg.status === "delivered") return "✓✓";
+    if (msg.status === "read") return "👁✓✓";
+    return "✓";
   };
 
-  const getOnlineStatusText = () => {
-    if (conversationOnline) return "Online";
-    if (conversationLastSeen) {
-      const lastSeen = new Date(conversationLastSeen);
-      const now = new Date();
-      const diffHours = Math.floor((now.getTime() - lastSeen.getTime()) / (1000 * 60 * 60));
-      
-      if (diffHours < 1) return `Last seen ${Math.floor(diffHours * 60)} minutes ago`;
-      if (diffHours < 24) return `Last seen ${diffHours} hours ago`;
-      return `Last seen ${formatDate(conversationLastSeen)}`;
+  // Auto-scroll when new messages
+  useEffect(() => {
+    if (shouldAutoScroll && messages.length > 0) {
+      scrollToBottom();
     }
-    return "Offline";
-  };
+  }, [messages, shouldAutoScroll]);
 
-  // Group messages by date
-  const groupedMessages = useMemo(() => {
-    const groups: { date: string; messages: Message[] }[] = [];
-    let currentDate = "";
-    
-    messages.forEach(msg => {
-      const msgDate = formatDate(msg.timestamp);
-      if (msgDate !== currentDate) {
-        currentDate = msgDate;
-        groups.push({ date: currentDate, messages: [] });
-      }
-      groups[groups.length - 1].messages.push(msg);
-    });
-    
-    return groups;
-  }, [messages]);
-
-  // Render
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full">
       {/* HEADER */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
-        <button 
-          onClick={onOpenSidebar} 
-          className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
-          aria-label="Open sidebar"
-        >
-          <span className="text-xl">☰</span>
-        </button>
+      <div className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between">
+        <button onClick={onOpenSidebar} className="md:hidden">☰</button>
 
-        <div className="flex items-center space-x-3 flex-1">
+        <div className="flex items-center space-x-3">
           <div className="relative">
             {conversation.avatar ? (
               <Image
@@ -843,7 +583,7 @@ export default function ChatArea({
                 className="w-12 h-12 rounded-full object-cover"
               />
             ) : (
-              <div className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center text-lg font-semibold">
+              <div className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center">
                 {conversation.name?.charAt(0).toUpperCase()}
               </div>
             )}
@@ -851,14 +591,14 @@ export default function ChatArea({
               <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
             )}
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-gray-900 truncate">{conversation.name}</h2>
+          <div>
+            <h2 className="font-semibold">{conversation.name}</h2>
             <div className="flex items-center gap-2">
               <p className={`text-sm ${conversationOnline ? "text-green-600" : "text-gray-500"}`}>
-                {getOnlineStatusText()}
+                {conversationOnline ? "Online" : "Offline"}
               </p>
               {isTyping && (
-                <span className="text-xs text-indigo-500 italic animate-pulse">typing...</span>
+                <span className="text-xs text-gray-500 italic">typing...</span>
               )}
             </div>
           </div>
@@ -867,54 +607,51 @@ export default function ChatArea({
         <div className="relative">
           <button
             onClick={() => setHeaderMenuOpen((prev) => !prev)}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            aria-label="More options"
-            aria-expanded={headerMenuOpen}
+            className="p-2 rounded-full hover:bg-gray-100"
           >
             <MoreVertical size={20} />
           </button>
 
           {headerMenuOpen && (
-            <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setHeaderMenuOpen(false)}
-              />
-              <div className="absolute right-0 mt-2 w-48 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+            <div className="absolute right-0 mt-2 w-44 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+              <button
+                onClick={() => {
+                  setIsReportOpen(true);
+                  setHeaderMenuOpen(false);
+                }}
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
+              >
+                Report User
+              </button>
+
+              {!blockStatus.iBlocked ? (
                 <button
-                  onClick={() => {
-                    setIsReportOpen(true);
+                  onClick={handleBlockUser}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                >
+                  Block User
+                </button>
+              ) : (
+                <button
+                  onClick={handleUnblockUser}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-yellow-700"
+                >
+                  Unblock
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  if (confirm("Delete all chat messages?")) {
+                    setMessages([]);
                     setHeaderMenuOpen(false);
-                  }}
-                  className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 text-red-600 border-b"
-                >
-                  ⚠️ Report User
-                </button>
-
-                {!blockStatus.iBlocked ? (
-                  <button
-                    onClick={handleBlockUser}
-                    className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700"
-                  >
-                    🚫 Block User
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleUnblockUser}
-                    className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 text-yellow-700"
-                  >
-                    ✅ Unblock User
-                  </button>
-                )}
-
-                <button
-                  onClick={handleDeleteChat}
-                  className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 text-red-500"
-                >
-                  🗑️ Delete Chat
-                </button>
-              </div>
-            </>
+                  }
+                }}
+                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-500"
+              >
+                Delete Chat
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -923,235 +660,160 @@ export default function ChatArea({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-6"
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"
       >
         {isLoading ? (
-          <div className="flex justify-center items-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-          </div>
+          <p className="text-center text-gray-500">Loading messages...</p>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-2xl">💬</span>
-            </div>
-            <p className="text-lg font-medium">No messages yet</p>
-            <p className="text-sm">Start a conversation!</p>
-          </div>
+          <p className="text-center text-gray-500">No messages yet. Start a conversation!</p>
         ) : (
-          <>
-            {isLoadingMore && (
-              <div className="flex justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
-              </div>
-            )}
-            
-            {groupedMessages.map((group) => (
-              <div key={group.date}>
-                <div className="flex justify-center my-4">
-                  <span className="bg-gray-200 text-gray-700 text-xs px-3 py-1 rounded-full">
-                    {group.date}
-                  </span>
-                </div>
-                {group.messages.map((msg) => {
-                  const isMe = msg.sender === "me";
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex ${isMe ? "justify-end" : "justify-start"} mb-2`}
-                      onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}
-                    >
-                      <div
-                        className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${
-                          isMe 
-                            ? "bg-indigo-500 text-white rounded-tr-none" 
-                            : "bg-white text-gray-900 shadow-sm border rounded-tl-none"
-                        } relative group`}
-                      >
-                        {/* Reply Preview */}
-                        {msg.replyTo && (
-                          <div className={`mb-2 p-2 rounded-lg border-l-3 ${
-                            isMe ? "bg-indigo-400 border-indigo-300" : "bg-gray-100 border-gray-300"
-                          }`}>
-                            <p className="text-xs font-medium truncate">
-                              {msg.replyTo.text ? `"${msg.replyTo.text}"` : "File/Media"}
-                            </p>
-                          </div>
-                        )}
+          messages.map((msg) => {
+            const isMe = msg.sender === "me";
+            return (
+              <div
+                key={msg.id}
+                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+                onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}
+              >
+                <div
+                  className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${
+                    isMe ? "bg-indigo-500 text-white" : "bg-white shadow-sm border"
+                  } relative`}
+                >
+                  {msg.replyTo && (
+                    <div className="bg-indigo-100 text-indigo-800 p-2 rounded mb-1 border-l-4 border-indigo-500 text-xs font-medium truncate">
+                      {msg.replyTo.text || "File/Media"}
+                    </div>
+                  )}
 
-                        {/* Message Text */}
-                        {msg.text && <p className="text-sm mb-2 whitespace-pre-wrap break-words">{msg.text}</p>}
+                  {msg.text && <p className="text-sm mb-1">{msg.text}</p>}
 
-                        {/* Files */}
-                        {msg.files && msg.files.length > 0 && (
-                          <div className="space-y-2 mb-2">
-                            {msg.files.map((file, i) => (
-                              <div key={i} className="border rounded-lg overflow-hidden bg-black/5">
-                                {isImage(file.fileType) ? (
-                                  <div className="relative">
-                                    <img
-                                      src={file.fileUrl}
-                                      alt={file.fileName}
-                                      className="w-full h-auto max-h-60 object-cover cursor-pointer"
-                                      onClick={() => window.open(file.fileUrl, "_blank")}
-                                    />
-                                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                                      {file.fileType.split('/')[1]?.toUpperCase()}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-3 p-3">
-                                    <FileText size={24} className="text-gray-600" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium truncate">{file.fileName}</p>
-                                      <p className="text-xs text-gray-500">
-                                        {(file.fileSize / 1024).toFixed(1)} KB • {file.fileType}
-                                      </p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          window.open(file.fileUrl, "_blank");
-                                        }}
-                                        className="p-1 hover:bg-gray-200 rounded"
-                                        title="Preview"
-                                      >
-                                        <Eye size={16} />
-                                      </button>
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDownload(file.fileUrl, file.fileName);
-                                        }}
-                                        className="p-1 hover:bg-gray-200 rounded"
-                                        title="Download"
-                                      >
-                                        <Download size={16} />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
+                  {msg.files && msg.files.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {msg.files.map((file, i) => (
+                        <div key={i} className="border rounded-lg overflow-hidden">
+                          {isImage(file.fileType) ? (
+                            <img
+                              src={file.fileUrl}
+                              alt={file.fileName}
+                              className="w-full h-auto max-h-40 object-cover cursor-pointer"
+                              onClick={() => window.open(file.fileUrl, "_blank")}
+                            />
+                          ) : (
+                            <div className="flex items-center gap-3 p-2 bg-gray-50">
+                              <FileText size={20} className="text-gray-600" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{file.fileName}</p>
+                                <p className="text-xs text-gray-500">{(file.fileSize / 1024).toFixed(1)} KB</p>
                               </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Timestamp & Status */}
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-xs opacity-75">
-                            {formatTime(msg.timestamp)}
-                          </p>
-                          {isMe && (
-                            <span className="ml-2">
-                              {getStatusIcon(msg)}
-                            </span>
+                              <div className="flex gap-1">
+                                <button onClick={() => window.open(file.fileUrl, "_blank")}>
+                                  <Eye size={14} />
+                                </button>
+                                <button onClick={() => handleDownload(file.fileUrl, file.fileName)}>
+                                  <Download size={14} />
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
-
-                        {/* Message Actions Menu */}
-                        {activeMessageId === msg.id && (
-                          <>
-                            <div 
-                              className="fixed inset-0 z-40" 
-                              onClick={() => setActiveMessageId(null)}
-                            />
-                            <div className="absolute top-0 right-0 mt-8 bg-white border shadow-lg rounded-md text-sm z-50 flex flex-col overflow-hidden min-w-32">
-                              <button
-                                className="px-4 py-2 hover:bg-gray-100 text-left text-gray-700 flex items-center gap-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setReplyingMessage(msg);
-                                  setActiveMessageId(null);
-                                }}
-                              >
-                                <span>↩️</span> Reply
-                              </button>
-                              {isMe && (
-                                <>
-                                  {msg.status === "failed" && (
-                                    <button
-                                      className="px-4 py-2 hover:bg-gray-100 text-left text-yellow-600 flex items-center gap-2"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onSendMessage(msg.text, []);
-                                        setActiveMessageId(null);
-                                      }}
-                                    >
-                                      <span>🔄</span> Retry
-                                    </button>
-                                  )}
-                                  <button
-                                    className="px-4 py-2 hover:bg-gray-100 text-left text-red-500 flex items-center gap-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteMessage(msg.id);
-                                    }}
-                                  >
-                                    <span>🗑️</span> Delete
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  )}
+
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-xs opacity-75">
+                      {formatTime(msg.timestamp)}
+                    </p>
+                    {isMe && (
+                      <span className="text-xs ml-2">
+                        {getStatusIcon(msg)}
+                      </span>
+                    )}
+                  </div>
+
+                  {activeMessageId === msg.id && (
+                    <div className="absolute top-0 right-0 bg-white border shadow-lg rounded-md text-sm z-50 flex flex-col overflow-hidden">
+                      <button
+                        className="px-3 py-1 hover:bg-gray-100 text-black"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReplyingMessage(msg);
+                          setActiveMessageId(null);
+                        }}
+                      >
+                        Reply
+                      </button>
+                      {isMe && (
+                        <>
+                          {msg.status === "failed" && (
+                            <button
+                              className="px-3 py-1 hover:bg-gray-100 text-yellow-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSendMessage(msg.text, []);
+                              }}
+                            >
+                              Retry
+                            </button>
+                          )}
+                          <button
+                            className="px-3 py-1 hover:bg-gray-100 text-red-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteMessage(msg.id);
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            ))}
-            
-            <div ref={messagesEndRef} />
-          </>
+            );
+          })
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* BLOCK NOTICES */}
       {blockStatus.blockedMe && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-center">
-          ⚠️ You are blocked by this user. You cannot send messages.
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 text-center">
+          You are blocked by this user
         </div>
       )}
       {blockStatus.iBlocked && !blockStatus.blockedMe && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 text-center">
-          ⚠️ You have blocked this user. Unblock to send messages.
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 text-center">
+          You have blocked this user
         </div>
       )}
 
       {/* REPLY PREVIEW */}
       {replyingMessage && (
-        <div className="px-4 py-3 bg-indigo-50 border-t border-indigo-100 flex items-center justify-between">
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-medium text-indigo-700 mb-1 block">Replying to</span>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center">
-                <span className="text-xs text-indigo-600">↩️</span>
-              </div>
-              <span className="text-sm font-medium text-indigo-900 truncate">
-                {replyingMessage.text || (replyingMessage.files?.length ? `File (${replyingMessage.files.length})` : "Media")}
-              </span>
-            </div>
+        <div className="px-4 py-2 bg-indigo-50 flex items-center justify-between">
+          <div className="flex flex-col max-w-[85%]">
+            <span className="text-[11px] text-indigo-700">Replying to</span>
+            <span className="text-sm font-semibold text-indigo-900 truncate">
+              {replyingMessage.text || "File / Media"}
+            </span>
           </div>
           <button
             onClick={() => setReplyingMessage(null)}
-            className="text-indigo-500 hover:text-red-500 font-bold p-1"
-            aria-label="Cancel reply"
+            className="text-indigo-500 hover:text-red-500 font-bold"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* MESSAGE INPUT */}
+      {/* INPUT */}
       <MessageInput
         onSendMessage={onSendMessage}
         replyingMessage={
           replyingMessage
-            ? { 
-                text: replyingMessage.text || "", 
-                id: replyingMessage.id,
-                sender: replyingMessage.sender
-              }
+            ? { text: replyingMessage.text || "", id: replyingMessage.id }
             : undefined
         }
         onCancelReply={() => setReplyingMessage(null)}
