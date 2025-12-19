@@ -283,99 +283,115 @@ export default function ChatArea({
   }, [conversation.id]);
 
   const onSendMessage = async (text: string, files?: File[]) => {
-    if (!currentUser || !conversation.id) return;
-    if (!text.trim() && (!files || files.length === 0)) return;
-
-    const token = localStorage.getItem("authToken");
-    const tempId = "temp-" + Date.now();
-
-    const localFiles =
-      files?.length
-        ? files.map((file) => ({
-            fileName: file.name,
-            fileUrl: URL.createObjectURL(file),
-            fileType: file.type,
-            fileSize: file.size,
-          }))
-        : [];
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        senderId: currentUser._id,
-        receiverId: conversation.id,
-        text,
-        timestamp: new Date().toISOString(),
-        sender: "me",
-        avatar: currentUser.profileImage,
-        files: localFiles,
-      },
-    ]);
-
-    scrollToBottom();
-
-    socket.emit("send-msg", {
-      tempId,
-      from: currentUser._id,
-      to: conversation.id,
-      messageText: text,
+  if (!currentUser || !conversation.id) return;
+  if (!text.trim() && (!files || files.length === 0)) return;
+  const token = localStorage.getItem("authToken");
+  const tempId = "temp-" + Date.now();
+  // :small_blue_diamond: Local preview (blob ONLY for UI)
+  const localFiles =
+    files?.length
+      ? files.map((file) => ({
+          fileName: file.name,
+          fileUrl: URL.createObjectURL(file), // UI only
+          fileType: file.type,
+          fileSize: file.size,
+        }))
+      : [];
+  // :small_blue_diamond: Optimistic UI
+  setMessages((prev) => [
+    ...prev,
+    {
+      id: tempId,
+      senderId: currentUser._id,
+      receiverId: conversation.id,
+      text,
+      timestamp: new Date().toISOString(),
+      sender: "me",
+      avatar: currentUser.profileImage,
       files: localFiles,
-      replyToId: replyingMessage?.id || null,
-    });
-
-    try {
+    },
+  ]);
+  scrollToBottom();
+  // :small_blue_diamond: Socket (UI sync only)
+  socket.emit("send-msg", {
+    tempId,
+    from: currentUser._id,
+    to: conversation.id,
+    messageText: text,
+    replyToId: replyingMessage?.id || null,
+  });
+  try {
+    // ==============================
+    // :pushpin: CASE 1: FILE MESSAGE
+    // ==============================
+    if (files && files.length > 0) {
       const formData = new FormData();
       formData.append("receiverId", conversation.id);
-      formData.append("replyToId", replyingMessage?.id || "");
-
-      if (files && files.length > 0) {
-        files.forEach((file) => {
-          formData.append("files", file);
-        });
-
-        const res = await fetch(
-          "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-          }
-        );
-
-        const data = await res.json();
-
-        if (data.success) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === tempId
-                ? mapSocketToMessage(data.data, currentUser, conversation)
-                : m
-            )
-          );
+      if (replyingMessage?.id) {
+        formData.append("replyToId", replyingMessage.id);
+      }
+      // :fire: BACKEND EXPECTS "file", not "files"
+      files.forEach((file) => {
+        formData.append("file", file);
+      });
+      const res = await fetch(
+        "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         }
-      } else {
-        formData.append("messageText", text);
-
-        await fetch(
-          "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-          }
+      );
+      const textRes = await res.text();
+      const data = JSON.parse(textRes); // safe now
+      if (data.success) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? mapSocketToMessage(data.data, currentUser, conversation)
+              : m
+          )
         );
       }
-    } catch (err) {
-      console.error("Send message error:", err);
-    } finally {
-      setReplyingMessage(null);
+      return;
     }
-  };
+    // ==============================
+    // :pushpin: CASE 2: TEXT ONLY MESSAGE
+    // ==============================
+    const res = await fetch(
+      "https://matrimonial-backend-7ahc.onrender.com/api/message",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          receiverId: conversation.id,
+          messageText: text,
+          replyToId: replyingMessage?.id || null,
+        }),
+      }
+    );
+    const data = await res.json();
+    if (data.success) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId
+            ? mapSocketToMessage(data.data, currentUser, conversation)
+            : m
+        )
+      );
+    }
+  } catch (err) {
+    console.error("Send message error:", err);
+  } finally {
+    setReplyingMessage(null);
+  }
+};
+
 
   const handleBlockUser = async () => {
     if (!conversation.id) return;
