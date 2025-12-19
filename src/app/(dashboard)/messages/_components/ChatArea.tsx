@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Socket } from "socket.io-client";
 import Image from "next/image";
 import MessageInput from "./MessageInput";
-import { Eye, Download, FileText, MoreVertical } from "lucide-react";
+import { Eye, Download, FileText, MoreVertical, Flag, X } from "lucide-react";
 import { Conversation, Message, MessageFile, SocketMessage } from "@/types/chat";
 
 interface User {
@@ -63,10 +63,13 @@ export default function ChatArea({
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
+  // Report Modal States
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportTitle, setReportTitle] = useState("");
   const [reportDescription, setReportDescription] = useState("");
   const [reportImages, setReportImages] = useState<File[]>([]);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -279,100 +282,100 @@ export default function ChatArea({
     fetchOnlineStatus();
   }, [conversation.id]);
 
-const onSendMessage = async (text: string, files?: File[]) => {
-  if (!currentUser || !conversation.id) return;
-  if (!text.trim() && (!files || files.length === 0)) return;
+  const onSendMessage = async (text: string, files?: File[]) => {
+    if (!currentUser || !conversation.id) return;
+    if (!text.trim() && (!files || files.length === 0)) return;
 
-  const token = localStorage.getItem("authToken");
-  const tempId = "temp-" + Date.now();
+    const token = localStorage.getItem("authToken");
+    const tempId = "temp-" + Date.now();
 
-  const localFiles =
-    files?.length
-      ? files.map((file) => ({
-          fileName: file.name,
-          fileUrl: URL.createObjectURL(file),
-          fileType: file.type,
-          fileSize: file.size,
-        }))
-      : [];
+    const localFiles =
+      files?.length
+        ? files.map((file) => ({
+            fileName: file.name,
+            fileUrl: URL.createObjectURL(file),
+            fileType: file.type,
+            fileSize: file.size,
+          }))
+        : [];
 
-  setMessages((prev) => [
-    ...prev,
-    {
-      id: tempId,
-      senderId: currentUser._id,
-      receiverId: conversation.id,
-      text,
-      timestamp: new Date().toISOString(),
-      sender: "me",
-      avatar: currentUser.profileImage,
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        senderId: currentUser._id,
+        receiverId: conversation.id,
+        text,
+        timestamp: new Date().toISOString(),
+        sender: "me",
+        avatar: currentUser.profileImage,
+        files: localFiles,
+      },
+    ]);
+
+    scrollToBottom();
+
+    socket.emit("send-msg", {
+      tempId,
+      from: currentUser._id,
+      to: conversation.id,
+      messageText: text,
       files: localFiles,
-    },
-  ]);
+      replyToId: replyingMessage?.id || null,
+    });
 
-  scrollToBottom();
+    try {
+      const formData = new FormData();
+      formData.append("receiverId", conversation.id);
+      formData.append("replyToId", replyingMessage?.id || "");
 
-  socket.emit("send-msg", {
-    tempId,
-    from: currentUser._id,
-    to: conversation.id,
-    messageText: text,
-    files: localFiles,
-    replyToId: replyingMessage?.id || null,
-  });
+      if (files && files.length > 0) {
+        files.forEach((file) => {
+          formData.append("files", file);
+        });
 
-  try {
-    const formData = new FormData();
-    formData.append("receiverId", conversation.id);
-    formData.append("replyToId", replyingMessage?.id || "");
+        const res = await fetch(
+          "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          }
+        );
 
-    if (files && files.length > 0) {
-      files.forEach((file) => {
-        formData.append("files", file);
-      });
+        const data = await res.json();
 
-      const res = await fetch(
-        "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
+        if (data.success) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === tempId
+                ? mapSocketToMessage(data.data, currentUser, conversation)
+                : m
+            )
+          );
         }
-      );
+      } else {
+        formData.append("messageText", text);
 
-      const data = await res.json();
-
-      if (data.success) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === tempId
-              ? mapSocketToMessage(data.data, currentUser, conversation)
-              : m
-          )
+        await fetch(
+          "https://matrimonial-backend-7ahc.onrender.com/api/message",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          }
         );
       }
-    } else {
-      formData.append("messageText", work);
-
-      await fetch(
-        "https://matrimonial-backend-7ahc.onrender.com/api/message",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
+    } catch (err) {
+      console.error("Send message error:", err);
+    } finally {
+      setReplyingMessage(null);
     }
-  } catch (err) {
-    console.error("Send message error:", err);
-  } finally {
-    setReplyingMessage(null);
-  }
-};
+  };
 
   const handleBlockUser = async () => {
     if (!conversation.id) return;
@@ -487,21 +490,34 @@ const onSendMessage = async (text: string, files?: File[]) => {
     setActiveMessageId(null);
   };
 
+  // REPORT SUBMIT FUNCTION
   const handleSubmitReport = async () => {
     if (!reportTitle.trim() || !reportDescription.trim()) {
-      alert("Please fill all fields");
+      alert("Please fill all required fields");
       return;
     }
 
+    setIsSubmittingReport(true);
+    setReportSuccess(false);
+
     try {
       const token = localStorage.getItem("authToken");
-      const formData = new FormData();
+      const reporterId = currentUser?._id; // Current logged in user
+      const reportedUserId = conversation.id; // User being reported
 
-      formData.append("reportedUser", conversation.id);
+      if (!reporterId) {
+        alert("Please login to submit report");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("reporter", reporterId);
+      formData.append("reportedUser", reportedUserId);
       formData.append("title", reportTitle);
       formData.append("description", reportDescription);
 
-      reportImages.forEach((img) => {
+      // Add images if any
+      reportImages.forEach((img, index) => {
         formData.append("image", img);
       });
 
@@ -509,26 +525,35 @@ const onSendMessage = async (text: string, files?: File[]) => {
         "https://matrimonial-backend-7ahc.onrender.com/api/report/create",
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 
+            "Authorization": `Bearer ${token}`,
+            // Don't set Content-Type for FormData, browser sets it automatically
+          },
           body: formData,
         }
       );
 
       const data = await res.json();
-      console.log("Report Response → ", data);
+      console.log("Report API Response:", data);
 
       if (data.success) {
-        alert("Report submitted successfully.");
-        setIsReportOpen(false);
-        setReportTitle("");
-        setReportDescription("");
-        setReportImages([]);
+        setReportSuccess(true);
+        // Reset form after success
+        setTimeout(() => {
+          setIsReportOpen(false);
+          setReportTitle("");
+          setReportDescription("");
+          setReportImages([]);
+          setReportSuccess(false);
+        }, 2000);
       } else {
         alert(data.message || "Failed to submit report");
       }
     } catch (err) {
-      console.error("Report error:", err);
-      alert("Failed to submit report");
+      console.error("Report submission error:", err);
+      alert("An error occurred while submitting the report");
+    } finally {
+      setIsSubmittingReport(false);
     }
   };
 
@@ -552,26 +577,24 @@ const onSendMessage = async (text: string, files?: File[]) => {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Header */}
-<div
-  className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between relative
-             max-md:fixed max-md:top-[56px] max-md:left-0 max-md:right-0 max-md:z-40"
->
-  <button onClick={onOpenSidebar} className="md:hidden">☰</button>
+      <div
+        className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between relative
+                   max-md:fixed max-md:top-[56px] max-md:left-0 max-md:right-0 max-md:z-40"
+      >
+        <button onClick={onOpenSidebar} className="md:hidden">☰</button>
 
-  <div className="flex items-center space-x-3">
-    <div className="relative">
-      {conversation.avatar ? (
-        <Image
-          src={conversation.avatar}
-          alt={conversation.name}
-          width={48}
-          height={48}
-          className="w-12 h-12 rounded-full object-cover"
-        />
-      
-
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            {conversation.avatar ? (
+              <Image
+                src={conversation.avatar}
+                alt={conversation.name}
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full object-cover"
+              />
             ) : (
               <div className="w-12 h-12 bg-indigo-500 text-white rounded-full flex items-center justify-center">
                 {conversation.name?.charAt(0).toUpperCase()}
@@ -591,26 +614,23 @@ const onSendMessage = async (text: string, files?: File[]) => {
 
         <div className="relative">
           <button
-            onClick={() => setHeaderMenuOpen((next) => !next)}
+            onClick={() => setHeaderMenuOpen((prev) => !prev)}
             className="p-2 rounded-full hover:bg-gray-100"
           >
             <MoreVertical size={20} />
           </button>
 
           {headerMenuOpen && (
-            <div className="
-              absolute right-0 mt-2 w-44 
-              bg-white shadow-xl rounded-xl border 
-              z-50 overflow-hidden
-            ">
-              {/* REPORT */}
+            <div className="absolute right-0 mt-2 w-48 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+              {/* REPORT BUTTON */}
               <button
                 onClick={() => {
-                  setIsReportOpen(false);
-                  setHeaderMenuOpen(true);
+                  setIsReportOpen(true);
+                  setHeaderMenuOpen(false);
                 }}
-                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
+                className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
               >
+                <Flag size={16} className="mr-2" />
                 Report User
               </button>
 
@@ -640,69 +660,6 @@ const onSendMessage = async (text: string, files?: File[]) => {
           )}
         </div>
       </div>
-
-      {/* Report Popup */}
-      {isReportOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-[92%] sm:w-96 rounded-lg shadow-lg p-5 space-y-4">
-            <h2 className="text-lg font-bold">Report User</h2>
-
-            <input
-              className="w-full border p-2 rounded"
-              placeholder="Enter report title (e.g. Spam)"
-              value={reportTitle}
-              onChange={(e) => setReportTitle(e.target.value)}
-            />
-
-            <textarea
-              className="w-full border p-2 rounded h-24"
-              placeholder="Describe the issue…"
-              value={reportDescription}
-              onChange={(e) => setReportDescription(e.target.value)}
-            />
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Upload Proof Images</label>
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={(e) => setReportImages(Array.from(e.target.files || []))}
-              />
-
-              {reportImages.length > 0 && (
-                <div className="mt-2 flex gap-2 flex-wrap">
-                  {reportImages.map((img, i) => (
-                    <div key={i} className="relative w-16 h-16 rounded overflow-hidden border">
-                      <img
-                        src={URL.createObjectURL(img)}
-                        className="w-full h-full object-cover"
-                        alt={`preview-${i}`}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <button
-                onClick={() => setIsReportOpen(false)}
-                className="px-4 py-2 rounded bg-gray-200"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleSubmitReport}
-                className="px-4 py-2 rounded bg-red-500 text-white"
-              >
-                Submit Report
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Messages */}
       <div
@@ -812,7 +769,7 @@ const onSendMessage = async (text: string, files?: File[]) => {
         </div>
       )}
 
-      {/* Instagram Style Reply Preview (Bottom Just Above Input) */}
+      {/* Instagram Style Reply Preview */}
       {replyingMessage && (
         <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-200 flex items-center justify-between shadow-sm">
           <div className="flex flex-col max-w-[85%]">
@@ -839,12 +796,139 @@ const onSendMessage = async (text: string, files?: File[]) => {
             ? { text: replyingMessage.text || "", id: replyingMessage.id }
             : undefined
         }
-        onCancelReply={() => setReplyingMessage(true)}
+        onCancelReply={() => setReplyingMessage(null)}
         disabled={blockStatus.blockedMe || blockStatus.iBlocked}
         socket={socket}
         currentUser={currentUser}
         to={conversation.id}
       />
+
+      {/* REPORT POPUP MODAL - Same position as before */}
+      {isReportOpen && (
+<div className="absolute inset-0 bg-black/30 flex items-center justify-center z-40 p-4">
+<div className="bg-white rounded-xl w-full max-w-md shadow-xl relative">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Report User
+              </h3>
+              <button
+                onClick={() => setIsReportOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+                disabled={isSubmittingReport}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {reportSuccess ? (
+                <div className="bg-green-50 text-green-700 p-4 rounded text-center">
+                  <div className="text-lg font-semibold mb-2">✓ Report Submitted Successfully!</div>
+                  <p>Your report has been received and will be reviewed by our team.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Title/Reason */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Reason for Report *
+                    </label>
+                    <select
+                      value={reportTitle}
+                      onChange={(e) => setReportTitle(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                      disabled={isSubmittingReport}
+                    >
+                      <option value="">Select a reason</option>
+                      <option value="spam">Spam</option>
+                      <option value="inappropriate">Inappropriate Content</option>
+                      <option value="harassment">Harassment</option>
+                      <option value="fake">Fake Profile</option>
+                      <option value="scam">Scam/Fraud</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description *
+                    </label>
+                    <textarea
+                      value={reportDescription}
+                      onChange={(e) => setReportDescription(e.target.value)}
+                      placeholder="Please provide detailed information about the issue..."
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                      disabled={isSubmittingReport}
+                    />
+                  </div>
+
+                  {/* Image Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Attach Proof Images (Optional)
+                    </label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(e) => setReportImages(Array.from(e.target.files || []))}
+                      className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      disabled={isSubmittingReport}
+                    />
+
+                    {reportImages.length > 0 && (
+                      <div className="mt-2 flex gap-2 flex-wrap">
+                        {reportImages.map((img, i) => (
+                          <div key={i} className="relative w-16 h-16 rounded overflow-hidden border group">
+                            <img
+                              src={URL.createObjectURL(img)}
+                              className="w-full h-full object-cover"
+                              alt={`proof-${i}`}
+                            />
+                            <button
+                              onClick={() => setReportImages(reportImages.filter((_, idx) => idx !== i))}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+                              disabled={isSubmittingReport}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end space-x-3 p-6 border-t">
+              <button
+                onClick={() => setIsReportOpen(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition"
+                disabled={isSubmittingReport}
+              >
+                Cancel
+              </button>
+              {!reportSuccess && (
+                <button
+                  onClick={handleSubmitReport}
+                  disabled={isSubmittingReport || !reportTitle.trim() || !reportDescription.trim()}
+                  className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded transition disabled:opacity-50"
+                >
+                  {isSubmittingReport ? 'Submitting...' : 'Submit Report'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
