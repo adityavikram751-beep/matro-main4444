@@ -29,7 +29,6 @@ function mapSocketToMessage(
   currentUser: User,
   conversation: Conversation
 ): Message {
-  // Safety check for undefined/null values
   if (!msg || !currentUser) {
     return {
       id: `error-${Date.now()}`,
@@ -43,17 +42,19 @@ function mapSocketToMessage(
     };
   }
 
+  // Fix: Check if sender is current user or conversation user
+  const isMe = msg.senderId === currentUser._id;
+  
   return {
     id: msg._id || msg.tempId || `msg-${msg.senderId || 'unknown'}-${msg.receiverId || 'unknown'}-${Date.now()}`,
     senderId: msg.senderId || '',
     receiverId: msg.receiverId || '',
     text: msg.messageText || '',
     timestamp: msg.createdAt || new Date().toISOString(),
-    sender: msg.senderId === currentUser._id ? "me" : "other",
-    avatar:
-      msg.senderId === currentUser._id
-        ? currentUser.profileImage || "/my-avatar.png"
-        : conversation?.avatar || "",
+    sender: isMe ? "me" : "other",
+    avatar: isMe 
+      ? (currentUser.profileImage || "/my-avatar.png")
+      : (conversation?.avatar || ""),
     files: msg.files || [],
     replyTo: msg.replyTo
       ? mapSocketToMessage(msg.replyTo, currentUser, conversation)
@@ -87,6 +88,7 @@ export default function ChatArea({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const processedMessageIds = useRef(new Set<string>());
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -103,10 +105,30 @@ export default function ChatArea({
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
+    // Clear processed IDs when conversation changes
+    processedMessageIds.current.clear();
+
     const handleSentMessage = (msg: SocketMessage) => {
-      if (!msg || msg.receiverId !== conversation.id) return;
+      if (!msg) return;
+
+      // Check if message is for current conversation
+      const isForCurrentConversation = 
+        msg.receiverId === conversation.id || 
+        msg.senderId === conversation.id;
+      
+      if (!isForCurrentConversation) return;
+
+      // Check if message already processed
+      const messageId = msg._id || msg.tempId;
+      if (messageId && processedMessageIds.current.has(messageId)) {
+        return;
+      }
+      if (messageId) {
+        processedMessageIds.current.add(messageId);
+      }
 
       setMessages((prev) => {
+        // Remove temp message if exists
         if (msg.tempId) {
           const tempIndex = prev.findIndex((m) => m.id === msg.tempId);
           if (tempIndex !== -1) {
@@ -116,27 +138,25 @@ export default function ChatArea({
           }
         }
 
-        const existingIndex = prev.findIndex((m) => m.id === msg._id);
-        if (existingIndex !== -1) {
-          const updated = [...prev];
-          updated[existingIndex] = mapSocketToMessage(msg, currentUser, conversation);
-          return updated;
+        // Check if message already exists
+        if (msg._id) {
+          const existingIndex = prev.findIndex((m) => m.id === msg._id);
+          if (existingIndex !== -1) {
+            const updated = [...prev];
+            updated[existingIndex] = mapSocketToMessage(msg, currentUser, conversation);
+            return updated;
+          }
         }
 
-        const lastMsg = prev[prev.length - 1];
-        const timeDiff = lastMsg
-          ? new Date(msg.createdAt || msg.timestamp).getTime() - new Date(lastMsg.timestamp).getTime()
-          : Infinity;
+        // Check for duplicate messages
+        const isDuplicate = prev.some(m => 
+          m.text === msg.messageText && 
+          m.senderId === msg.senderId && 
+          Math.abs(new Date(m.timestamp).getTime() - new Date(msg.createdAt || msg.timestamp).getTime()) < 1000
+        );
 
-        if (
-          lastMsg &&
-          lastMsg.senderId === msg.senderId &&
-          lastMsg.text === msg.messageText &&
-          Math.abs(timeDiff) < 0.00001
-        ) {
-          const updated = [...prev];
-          updated[prev.length - 1] = mapSocketToMessage(msg, currentUser, conversation);
-          return updated;
+        if (isDuplicate) {
+          return prev;
         }
 
         return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
@@ -148,15 +168,39 @@ export default function ChatArea({
         return;
       }
 
-      const isRelevant = msg.senderId === conversation.id && msg.receiverId === currentUser._id;
+      // Message should be from conversation user to current user
+      const isRelevant = 
+        msg.senderId === conversation.id && 
+        msg.receiverId === currentUser._id;
+      
       if (!isRelevant) {
         return;
+      }
+
+      // Check if message already processed
+      if (msg._id && processedMessageIds.current.has(msg._id)) {
+        return;
+      }
+      if (msg._id) {
+        processedMessageIds.current.add(msg._id);
       }
 
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg._id)) {
           return prev;
         }
+        
+        // Check for duplicate messages
+        const isDuplicate = prev.some(m => 
+          m.text === msg.messageText && 
+          m.senderId === msg.senderId && 
+          Math.abs(new Date(m.timestamp).getTime() - new Date(msg.createdAt || msg.timestamp).getTime()) < 1000
+        );
+
+        if (isDuplicate) {
+          return prev;
+        }
+
         return [...prev, mapSocketToMessage(msg, currentUser, conversation)];
       });
 
@@ -180,9 +224,18 @@ export default function ChatArea({
     const handleUserOnline = (userId: string) => {
       if (userId === conversation.id) setConversationOnline(true);
     };
+    
     const handleUserOffline = (userId: string) => {
       if (userId === conversation.id) setConversationOnline(false);
     };
+
+    // Fix: Remove old listeners before adding new ones
+    socket.off("msg-sent");
+    socket.off("msg-receive");
+    socket.off("user-blocked");
+    socket.off("user-unblocked");
+    socket.off("user-online");
+    socket.off("user-offline");
 
     socket.on("msg-sent", handleSentMessage);
     socket.on("msg-receive", handleIncomingMessage);
@@ -244,29 +297,26 @@ export default function ChatArea({
           }
         );
         
-        // Check if response is HTML (error page)
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          const text = await res.text();
-          console.error("Non-JSON response received:", text.substring(0, 200));
-          throw new Error("Server returned non-JSON response");
-        }
-
         if (!res.ok) {
           throw new Error(`Failed to fetch messages: ${res.status} ${res.statusText}`);
         }
 
         const data = await res.json();
         
-        // Validate data structure
         if (!data || !Array.isArray(data.data)) {
           console.error("Invalid data structure received:", data);
           throw new Error("Invalid response data format");
         }
 
-        const loadedMessages: Message[] = data.data.map((msg: SocketMessage) =>
-          mapSocketToMessage(msg, currentUser, conversation)
-        );
+        // Clear processed IDs for new messages
+        processedMessageIds.current.clear();
+
+        const loadedMessages: Message[] = data.data.map((msg: SocketMessage) => {
+          if (msg._id) {
+            processedMessageIds.current.add(msg._id);
+          }
+          return mapSocketToMessage(msg, currentUser, conversation);
+        });
 
         setMessages(loadedMessages);
         setIsLoading(false);
@@ -274,7 +324,6 @@ export default function ChatArea({
       } catch (err: any) {
         console.error("Failed to fetch messages:", err);
         setIsLoading(false);
-        // Set empty messages instead of crashing
         setMessages([]);
       }
     };
@@ -350,34 +399,38 @@ export default function ChatArea({
     if (!text.trim() && (!files || files.length === 0)) return;
 
     const token = localStorage.getItem("authToken");
+    if (!token) {
+      alert("Please login to send message");
+      return;
+    }
+
     const tempId = "temp-" + Date.now();
 
-    const localFiles =
-      files?.length
-        ? files.map((file) => ({
-            fileName: file.name,
-            fileUrl: URL.createObjectURL(file),
-            fileType: file.type,
-            fileSize: file.size,
-          }))
-        : [];
+    const localFiles = files?.map((file) => ({
+      fileName: file.name,
+      fileUrl: URL.createObjectURL(file),
+      fileType: file.type,
+      fileSize: file.size,
+    })) || [];
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        senderId: currentUser._id,
-        receiverId: conversation.id,
-        text,
-        timestamp: new Date().toISOString(),
-        sender: "me",
-        avatar: currentUser.profileImage,
-        files: localFiles,
-      },
-    ]);
+    // Add temp message
+    const tempMessage: Message = {
+      id: tempId,
+      senderId: currentUser._id,
+      receiverId: conversation.id,
+      text,
+      timestamp: new Date().toISOString(),
+      sender: "me",
+      avatar: currentUser.profileImage || "/my-avatar.png",
+      files: localFiles,
+    };
+
+    setMessages((prev) => [...prev, tempMessage]);
+    processedMessageIds.current.add(tempId);
 
     scrollToBottom();
 
+    // Emit socket message
     socket.emit("send-msg", {
       tempId,
       from: currentUser._id,
@@ -390,7 +443,9 @@ export default function ChatArea({
     try {
       const formData = new FormData();
       formData.append("receiverId", conversation.id);
-      formData.append("replyToId", replyingMessage?.id || "");
+      if (replyingMessage?.id) {
+        formData.append("replyToId", replyingMessage.id);
+      }
 
       if (files && files.length > 0) {
         files.forEach((file) => {
@@ -408,12 +463,10 @@ export default function ChatArea({
           }
         );
 
-        // Check response content type
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
+        if (res.ok) {
           const data = await res.json();
-
-          if (data.success) {
+          if (data.success && data.data) {
+            // Update temp message with server response
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === tempId
@@ -437,9 +490,18 @@ export default function ChatArea({
           }
         );
 
-        // Just check if successful, don't parse if not JSON
-        if (!res.ok) {
-          console.error("Send message failed:", res.status);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.data) {
+            // Update temp message with server response
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempId
+                  ? mapSocketToMessage(data.data, currentUser, conversation)
+                  : m
+              )
+            );
+          }
         }
       }
     } catch (err) {
@@ -470,25 +532,12 @@ export default function ChatArea({
         }
       );
       
-      // Check if response is JSON before parsing
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (res.ok) {
-          setBlockStatus({ ...blockStatus, iBlocked: true });
-          alert("User blocked");
-          setHeaderMenuOpen(false);
-        } else {
-          alert(data.message || "Failed to block user");
-        }
+      if (res.ok) {
+        setBlockStatus({ ...blockStatus, iBlocked: true });
+        alert("User blocked");
+        setHeaderMenuOpen(false);
       } else {
-        if (res.ok) {
-          setBlockStatus({ ...blockStatus, iBlocked: true });
-          alert("User blocked");
-          setHeaderMenuOpen(false);
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
+        alert("Failed to block user");
       }
     } catch (err: any) {
       console.error(err);
@@ -517,23 +566,11 @@ export default function ChatArea({
         }
       );
       
-      // Check if response is JSON before parsing
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (res.ok) {
-          setBlockStatus({ ...blockStatus, iBlocked: false });
-          alert("User unblocked");
-        } else {
-          alert(data.message || "Failed to unblock user");
-        }
+      if (res.ok) {
+        setBlockStatus({ ...blockStatus, iBlocked: false });
+        alert("User unblocked");
       } else {
-        if (res.ok) {
-          setBlockStatus({ ...blockStatus, iBlocked: false });
-          alert("User unblocked");
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
+        alert("Failed to unblock user");
       }
     } catch (err: any) {
       console.error(err);
@@ -564,35 +601,18 @@ export default function ChatArea({
         }
       );
       
-      // Check if response is JSON before parsing
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (res.ok) {
-          setMessages([]);
-          alert("All messages deleted successfully");
-          setHeaderMenuOpen(false);
+      if (res.ok) {
+        setMessages([]);
+        processedMessageIds.current.clear();
+        alert("All messages deleted successfully");
+        setHeaderMenuOpen(false);
 
-          socket.emit("delete-chat", {
-            from: currentUser?._id,
-            to: conversation.id,
-          });
-        } else {
-          alert(data.message || "Failed to delete all messages");
-        }
+        socket.emit("delete-chat", {
+          from: currentUser?._id,
+          to: conversation.id,
+        });
       } else {
-        if (res.ok) {
-          setMessages([]);
-          alert("All messages deleted successfully");
-          setHeaderMenuOpen(false);
-
-          socket.emit("delete-chat", {
-            from: currentUser?._id,
-            to: conversation.id,
-          });
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
+        alert("Failed to delete all messages");
       }
     } catch (err: any) {
       console.error(err);
@@ -601,8 +621,9 @@ export default function ChatArea({
   };
 
   const handleDelete = async (msgId: string) => {
-    if (msgId.startsWith("temp-"))
+    if (msgId.startsWith("temp-")) {
       return setMessages((prev) => prev.filter((m) => m.id !== msgId));
+    }
 
     try {
       const token = localStorage.getItem("authToken");
@@ -623,23 +644,11 @@ export default function ChatArea({
         }
       );
       
-      // Check if response is JSON before parsing
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (res.ok) {
-          setMessages((prev) => prev.filter((m) => m.id !== msgId));
-          setActiveMessageId(null);
-        } else {
-          alert(data.message || "Failed to delete message");
-        }
+      if (res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== msgId));
+        setActiveMessageId(null);
       } else {
-        if (res.ok) {
-          setMessages((prev) => prev.filter((m) => m.id !== msgId));
-          setActiveMessageId(null);
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
+        alert("Failed to delete message");
       }
     } catch (err: any) {
       console.error(err);
@@ -664,8 +673,8 @@ export default function ChatArea({
 
     try {
       const token = localStorage.getItem("authToken");
-      const reporterId = currentUser?._id; // Current logged in user
-      const reportedUserId = conversation.id; // User being reported
+      const reporterId = currentUser?._id;
+      const reportedUserId = conversation.id;
 
       if (!reporterId) {
         alert("Please login to submit report");
@@ -678,7 +687,6 @@ export default function ChatArea({
       formData.append("title", reportTitle);
       formData.append("description", reportDescription);
 
-      // Add images if any
       reportImages.forEach((img, index) => {
         formData.append("image", img);
       });
@@ -694,15 +702,10 @@ export default function ChatArea({
         }
       );
 
-      // Check content type before parsing JSON
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
+      if (res.ok) {
         const data = await res.json();
-        console.log("Report API Response:", data);
-
         if (data.success) {
           setReportSuccess(true);
-          // Reset form after success
           setTimeout(() => {
             setIsReportOpen(false);
             setReportTitle("");
@@ -714,10 +717,7 @@ export default function ChatArea({
           alert(data.message || "Failed to submit report");
         }
       } else {
-        // Non-JSON response (likely HTML error page)
-        const text = await res.text();
-        console.error("Non-JSON response from report API:", text.substring(0, 200));
-        alert("Server error occurred. Please try again.");
+        alert("Failed to submit report");
       }
     } catch (err) {
       console.error("Report submission error:", err);
@@ -732,52 +732,63 @@ export default function ChatArea({
 
   const isImage = (fileType: string) => fileType.startsWith("image/");
 
-  // FIXED: Download function with better error handling
-  const handleDownload = async (url: string, name: string) => {
+  // FIXED Download function - Works for all file types
+  const handleDownload = async (fileUrl: string, fileName: string) => {
     try {
-      // Check if URL is valid
-      if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
-        // If it's a blob URL or data URL, use it directly
+      // Check if it's a blob URL (local file)
+      if (fileUrl.startsWith('blob:')) {
+        // For blob URLs, create download directly
         const a = document.createElement("a");
-        a.href = url;
-        a.download = name;
+        a.href = fileUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(a.href);
+        document.body.removeChild(a);
         return;
       }
 
-      // For external URLs, try to fetch with credentials
-      const res = await fetch(url, {
+      // For server URLs, fetch with proper headers
+      const response = await fetch(fileUrl, {
         method: 'GET',
-        mode: 'cors',
-        credentials: 'include',
         headers: {
           'Accept': '*/*',
-        }
+        },
+        mode: 'cors',
+        credentials: 'same-origin'
       });
 
-      if (!res.ok) {
-        throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
       }
 
-      const blob = await res.blob();
-      const downloadUrl = URL.createObjectURL(blob);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = name;
+      a.style.display = 'none';
+      a.href = url;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
+      window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-    } catch (err: any) {
-      console.error("Download error:", err);
+    } catch (error) {
+      console.error('Download error:', error);
       
-      // Fallback: open in new tab if download fails
+      // Fallback: Try to open in new tab
       try {
-        window.open(url, '_blank');
-      } catch (fallbackErr) {
-        alert(`Unable to download file: ${err.message || 'Unknown error'}`);
+        window.open(fileUrl, '_blank');
+      } catch (fallbackError) {
+        alert(`Unable to download "${fileName}". You can try right-clicking and selecting "Save as".`);
       }
+    }
+  };
+
+  // FIXED: Show avatar properly
+  const getAvatar = (msg: Message) => {
+    if (msg.sender === "me") {
+      return currentUser?.profileImage || "/my-avatar.png";
+    } else {
+      return conversation.avatar || "";
     }
   };
 
@@ -875,19 +886,39 @@ export default function ChatArea({
         {isLoading ? (
           <p className="text-center text-gray-500">Loading messages...</p>
         ) : messages.length === 0 ? (
-          <p className="text-center text-gray-500">No messages yet</p>
+          <p className="text-center text-gray-500">No messages yet. Start a conversation!</p>
         ) : (
           messages.map((msg) => {
             const isMe = msg.sender === "me";
+            const avatarUrl = getAvatar(msg);
+            
             return (
               <div
                 key={msg.id}
-                className={`flex ${isMe ? "justify-end" : "justify-start"} message-bubble`}
+                className={`flex ${isMe ? "justify-end" : "justify-start"} items-end gap-2 message-bubble`}
                 onClick={() => setActiveMessageId(msg.id === activeMessageId ? null : msg.id)}
               >
+                {!isMe && avatarUrl && (
+                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                    {avatarUrl.startsWith('http') || avatarUrl.startsWith('/') ? (
+                      <Image
+                        src={avatarUrl}
+                        alt="Avatar"
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-indigo-500 text-white flex items-center justify-center text-sm">
+                        {conversation.name?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <div
                   className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${
-                    isMe ? "bg-indigo-500 text-white" : "bg-white shadow-sm border"
+                    isMe ? "bg-indigo-500 text-white rounded-tr-none" : "bg-white shadow-sm border rounded-tl-none"
                   } ${replyingMessage?.id === msg.id ? "ring-2 ring-indigo-400" : ""} relative`}
                 >
                   {msg.replyTo && (
@@ -903,33 +934,59 @@ export default function ChatArea({
                       {msg.files.map((file, i) => (
                         <div key={i} className="border rounded-lg overflow-hidden relative">
                           {isImage(file.fileType) ? (
-                            <img
-                              src={file.fileUrl}
-                              alt={file.fileName}
-                              className="w-full h-auto max-h-40 object-cover cursor-pointer"
-                              onClick={() => window.open(file.fileUrl, "_blank")}
-                            />
+                            <div className="relative">
+                              <img
+                                src={file.fileUrl}
+                                alt={file.fileName}
+                                className="w-full h-auto max-h-40 object-cover cursor-pointer"
+                                onClick={() => window.open(file.fileUrl, "_blank")}
+                              />
+                              <div className="absolute bottom-2 right-2 flex gap-1 bg-black/50 p-1 rounded">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(file.fileUrl, "_blank");
+                                  }}
+                                  className="p-1 bg-white/20 rounded hover:bg-white/30 transition"
+                                  title="View full image"
+                                >
+                                  <Eye size={14} className="text-white" />
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownload(file.fileUrl, file.fileName);
+                                  }}
+                                  className="p-1 bg-white/20 rounded hover:bg-white/30 transition"
+                                  title="Download image"
+                                >
+                                  <Download size={14} className="text-white" />
+                                </button>
+                              </div>
+                            </div>
                           ) : (
-                            <div className="flex items-center gap-3 p-2 bg-gray-50">
-                              <FileText size={20} className="text-gray-600" />
+                            <div className="flex items-center gap-3 p-3 bg-gray-50">
+                              <FileText size={24} className="text-indigo-600 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{file.fileName}</p>
-                                <p className="text-xs text-gray-500">{(file.fileSize / 1024).toFixed(1)} KB</p>
+                                <p className="text-xs text-gray-500">
+                                  {file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
+                                </p>
                               </div>
-                              <div className="flex gap-1">
+                              <div className="flex gap-2">
                                 <button 
                                   onClick={() => window.open(file.fileUrl, "_blank")}
-                                  className="hover:text-blue-600 transition-colors"
+                                  className="p-1 hover:bg-gray-200 rounded transition"
                                   title="View file"
                                 >
-                                  <Eye size={14} />
+                                  <Eye size={16} />
                                 </button>
                                 <button 
                                   onClick={() => handleDownload(file.fileUrl, file.fileName)}
-                                  className="hover:text-green-600 transition-colors"
+                                  className="p-1 hover:bg-gray-200 rounded transition"
                                   title="Download file"
                                 >
-                                  <Download size={14} />
+                                  <Download size={16} />
                                 </button>
                               </div>
                             </div>
@@ -939,7 +996,9 @@ export default function ChatArea({
                     </div>
                   )}
 
-                  <p className="text-xs mt-1 text-gray-300">{formatTime(msg.timestamp)}</p>
+                  <p className={`text-xs mt-1 ${isMe ? "text-indigo-200" : "text-gray-500"}`}>
+                    {formatTime(msg.timestamp)}
+                  </p>
 
                   {activeMessageId === msg.id && (
                     <div className="absolute top-0 right-0 bg-white border shadow-lg rounded-md text-sm z-50 flex flex-col overflow-hidden">
@@ -966,6 +1025,24 @@ export default function ChatArea({
                     </div>
                   )}
                 </div>
+
+                {isMe && avatarUrl && (
+                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                    {avatarUrl.startsWith('http') || avatarUrl.startsWith('/') ? (
+                      <Image
+                        src={avatarUrl}
+                        alt="My Avatar"
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-indigo-500 text-white flex items-center justify-center text-sm">
+                        {currentUser?.firstName?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
