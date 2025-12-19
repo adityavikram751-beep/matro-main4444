@@ -360,7 +360,7 @@ export default function ChatArea({
         formData.append("messageText", text);
 
         await fetch(
-          "https://matrimonial-backend-7ahc.onrender.com/api/message",
+          "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
           {
             method: "POST",
             headers: {
