@@ -29,18 +29,32 @@ function mapSocketToMessage(
   currentUser: User,
   conversation: Conversation
 ): Message {
+  // Safety check for undefined/null values
+  if (!msg || !currentUser) {
+    return {
+      id: `error-${Date.now()}`,
+      senderId: '',
+      receiverId: '',
+      text: 'Message error',
+      timestamp: new Date().toISOString(),
+      sender: 'other',
+      avatar: conversation?.avatar || '',
+      files: [],
+    };
+  }
+
   return {
-    id: msg._id || msg.tempId || `msg-${msg.senderId}-${msg.receiverId}-${Date.now()}`,
-    senderId: msg.senderId,
-    receiverId: msg.receiverId,
-    text: msg.messageText,
+    id: msg._id || msg.tempId || `msg-${msg.senderId || 'unknown'}-${msg.receiverId || 'unknown'}-${Date.now()}`,
+    senderId: msg.senderId || '',
+    receiverId: msg.receiverId || '',
+    text: msg.messageText || '',
     timestamp: msg.createdAt || new Date().toISOString(),
     sender: msg.senderId === currentUser._id ? "me" : "other",
     avatar:
       msg.senderId === currentUser._id
         ? currentUser.profileImage || "/my-avatar.png"
-        : conversation.avatar,
-    files: msg.files,
+        : conversation?.avatar || "",
+    files: msg.files || [],
     replyTo: msg.replyTo
       ? mapSocketToMessage(msg.replyTo, currentUser, conversation)
       : undefined,
@@ -90,8 +104,7 @@ export default function ChatArea({
     if (!socket || !currentUser || !conversation) return;
 
     const handleSentMessage = (msg: SocketMessage) => {
-
-      if (msg.receiverId !== conversation.id) return;
+      if (!msg || msg.receiverId !== conversation.id) return;
 
       setMessages((prev) => {
         if (msg.tempId) {
@@ -131,8 +144,7 @@ export default function ChatArea({
     };
 
     const handleIncomingMessage = (msg: SocketMessage) => {
-
-      if (msg.senderId === currentUser._id) {
+      if (!msg || msg.senderId === currentUser._id) {
         return;
       }
 
@@ -216,13 +228,42 @@ export default function ChatArea({
     const fetchMessages = async () => {
       try {
         const token = localStorage.getItem("authToken");
+        if (!token) {
+          console.error("No auth token found");
+          setIsLoading(false);
+          return;
+        }
+
         const res = await fetch(
           `https://matrimonial-backend-7ahc.onrender.com/api/message?currentUserId=${conversation.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { 
+            headers: { 
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            } 
+          }
         );
-        if (!res.ok) throw new Error("Failed to fetch messages");
+        
+        // Check if response is HTML (error page)
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await res.text();
+          console.error("Non-JSON response received:", text.substring(0, 200));
+          throw new Error("Server returned non-JSON response");
+        }
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch messages: ${res.status} ${res.statusText}`);
+        }
 
         const data = await res.json();
+        
+        // Validate data structure
+        if (!data || !Array.isArray(data.data)) {
+          console.error("Invalid data structure received:", data);
+          throw new Error("Invalid response data format");
+        }
+
         const loadedMessages: Message[] = data.data.map((msg: SocketMessage) =>
           mapSocketToMessage(msg, currentUser, conversation)
         );
@@ -230,9 +271,11 @@ export default function ChatArea({
         setMessages(loadedMessages);
         setIsLoading(false);
         setShouldAutoScroll(true);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to fetch messages:", err);
         setIsLoading(false);
+        // Set empty messages instead of crashing
+        setMessages([]);
       }
     };
 
@@ -244,16 +287,26 @@ export default function ChatArea({
     const fetchBlockStatus = async () => {
       try {
         const token = localStorage.getItem("authToken");
+        if (!token) return;
+        
         const res = await fetch(
           `https://matrimonial-backend-7ahc.onrender.com/api/message/isBlocked/${conversation.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { 
+            headers: { 
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            } 
+          }
         );
-        const data = await res.json();
-        if (data.success) {
-          setBlockStatus({
-            iBlocked: data.data.iBlocked,
-            blockedMe: data.data.blockedMe,
-          });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setBlockStatus({
+              iBlocked: data.data.iBlocked,
+              blockedMe: data.data.blockedMe,
+            });
+          }
         }
       } catch (err) {
         console.error("Failed to fetch block status:", err);
@@ -267,13 +320,23 @@ export default function ChatArea({
       if (!conversation.id) return;
       try {
         const token = localStorage.getItem("authToken");
+        if (!token) return;
+        
         const res = await fetch(
           `https://matrimonial-backend-7ahc.onrender.com/api/message/online`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { 
+            headers: { 
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            } 
+          }
         );
-        const data = await res.json();
-        const onlineUsers: string[] = data.data || [];
-        setConversationOnline(onlineUsers.includes(conversation.id));
+        
+        if (res.ok) {
+          const data = await res.json();
+          const onlineUsers: string[] = data.data || [];
+          setConversationOnline(onlineUsers.includes(conversation.id));
+        }
       } catch (err) {
         console.error("Failed to fetch online status:", err);
         setConversationOnline(false);
@@ -345,21 +408,25 @@ export default function ChatArea({
           }
         );
 
-        const data = await res.json();
+        // Check response content type
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await res.json();
 
-        if (data.success) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === tempId
-                ? mapSocketToMessage(data.data, currentUser, conversation)
-                : m
-            )
-          );
+          if (data.success) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempId
+                  ? mapSocketToMessage(data.data, currentUser, conversation)
+                  : m
+              )
+            );
+          }
         }
       } else {
         formData.append("messageText", text);
 
-        await fetch(
+        const res = await fetch(
           "https://matrimonial-backend-7ahc.onrender.com/api/message",
           {
             method: "POST",
@@ -369,6 +436,11 @@ export default function ChatArea({
             body: formData,
           }
         );
+
+        // Just check if successful, don't parse if not JSON
+        if (!res.ok) {
+          console.error("Send message failed:", res.status);
+        }
       }
     } catch (err) {
       console.error("Send message error:", err);
@@ -381,6 +453,11 @@ export default function ChatArea({
     if (!conversation.id) return;
     try {
       const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("Please login first");
+        return;
+      }
+      
       const res = await fetch(
         `https://matrimonial-backend-7ahc.onrender.com/api/message/block`,
         {
@@ -392,10 +469,27 @@ export default function ChatArea({
           body: JSON.stringify({ otherUserId: conversation.id }),
         }
       );
-      if (!res.ok) throw new Error("Failed to block user");
-      setBlockStatus({ ...blockStatus, iBlocked: true });
-      alert("User blocked");
-      setHeaderMenuOpen(false);
+      
+      // Check if response is JSON before parsing
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (res.ok) {
+          setBlockStatus({ ...blockStatus, iBlocked: true });
+          alert("User blocked");
+          setHeaderMenuOpen(false);
+        } else {
+          alert(data.message || "Failed to block user");
+        }
+      } else {
+        if (res.ok) {
+          setBlockStatus({ ...blockStatus, iBlocked: true });
+          alert("User blocked");
+          setHeaderMenuOpen(false);
+        } else {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      }
     } catch (err: any) {
       console.error(err);
       alert(`Error: ${err.message}`);
@@ -406,6 +500,11 @@ export default function ChatArea({
     if (!conversation.id) return;
     try {
       const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("Please login first");
+        return;
+      }
+      
       const res = await fetch(
         `https://matrimonial-backend-7ahc.onrender.com/api/message/unblock`,
         {
@@ -417,9 +516,25 @@ export default function ChatArea({
           body: JSON.stringify({ otherUserId: conversation.id }),
         }
       );
-      if (!res.ok) throw new Error("Failed to unblock user");
-      setBlockStatus({ ...blockStatus, iBlocked: false });
-      alert("User unblocked");
+      
+      // Check if response is JSON before parsing
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (res.ok) {
+          setBlockStatus({ ...blockStatus, iBlocked: false });
+          alert("User unblocked");
+        } else {
+          alert(data.message || "Failed to unblock user");
+        }
+      } else {
+        if (res.ok) {
+          setBlockStatus({ ...blockStatus, iBlocked: false });
+          alert("User unblocked");
+        } else {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      }
     } catch (err: any) {
       console.error(err);
       alert(`Error: ${err.message}`);
@@ -432,6 +547,11 @@ export default function ChatArea({
 
     try {
       const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("Please login first");
+        return;
+      }
+      
       const res = await fetch(
         `https://matrimonial-backend-7ahc.onrender.com/api/message/delete/chat`,
         {
@@ -443,16 +563,37 @@ export default function ChatArea({
           body: JSON.stringify({ otherUserId: conversation.id }),
         }
       );
-      if (!res.ok) throw new Error("Failed to delete all messages");
+      
+      // Check if response is JSON before parsing
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (res.ok) {
+          setMessages([]);
+          alert("All messages deleted successfully");
+          setHeaderMenuOpen(false);
 
-      setMessages([]);
-      alert("All messages deleted successfully");
-      setHeaderMenuOpen(false);
+          socket.emit("delete-chat", {
+            from: currentUser?._id,
+            to: conversation.id,
+          });
+        } else {
+          alert(data.message || "Failed to delete all messages");
+        }
+      } else {
+        if (res.ok) {
+          setMessages([]);
+          alert("All messages deleted successfully");
+          setHeaderMenuOpen(false);
 
-      socket.emit("delete-chat", {
-        from: currentUser?._id,
-        to: conversation.id,
-      });
+          socket.emit("delete-chat", {
+            from: currentUser?._id,
+            to: conversation.id,
+          });
+        } else {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      }
     } catch (err: any) {
       console.error(err);
       alert(`Error: ${err.message}`);
@@ -465,6 +606,11 @@ export default function ChatArea({
 
     try {
       const token = localStorage.getItem("authToken");
+      if (!token) {
+        alert("Please login first");
+        return;
+      }
+      
       const res = await fetch(
         `https://matrimonial-backend-7ahc.onrender.com/api/message/delete/message`,
         {
@@ -476,9 +622,25 @@ export default function ChatArea({
           body: JSON.stringify({ messageId: msgId }),
         }
       );
-      if (!res.ok) throw new Error("Failed to delete message");
-      setMessages((prev) => prev.filter((m) => m.id !== msgId));
-      setActiveMessageId(null);
+      
+      // Check if response is JSON before parsing
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (res.ok) {
+          setMessages((prev) => prev.filter((m) => m.id !== msgId));
+          setActiveMessageId(null);
+        } else {
+          alert(data.message || "Failed to delete message");
+        }
+      } else {
+        if (res.ok) {
+          setMessages((prev) => prev.filter((m) => m.id !== msgId));
+          setActiveMessageId(null);
+        } else {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      }
     } catch (err: any) {
       console.error(err);
       alert(`Error: ${err.message}`);
@@ -527,27 +689,35 @@ export default function ChatArea({
           method: "POST",
           headers: { 
             "Authorization": `Bearer ${token}`,
-            // Don't set Content-Type for FormData, browser sets it automatically
           },
           body: formData,
         }
       );
 
-      const data = await res.json();
-      console.log("Report API Response:", data);
+      // Check content type before parsing JSON
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        console.log("Report API Response:", data);
 
-      if (data.success) {
-        setReportSuccess(true);
-        // Reset form after success
-        setTimeout(() => {
-          setIsReportOpen(false);
-          setReportTitle("");
-          setReportDescription("");
-          setReportImages([]);
-          setReportSuccess(false);
-        }, 2000);
+        if (data.success) {
+          setReportSuccess(true);
+          // Reset form after success
+          setTimeout(() => {
+            setIsReportOpen(false);
+            setReportTitle("");
+            setReportDescription("");
+            setReportImages([]);
+            setReportSuccess(false);
+          }, 2000);
+        } else {
+          alert(data.message || "Failed to submit report");
+        }
       } else {
-        alert(data.message || "Failed to submit report");
+        // Non-JSON response (likely HTML error page)
+        const text = await res.text();
+        console.error("Non-JSON response from report API:", text.substring(0, 200));
+        alert("Server error occurred. Please try again.");
       }
     } catch (err) {
       console.error("Report submission error:", err);
@@ -562,17 +732,52 @@ export default function ChatArea({
 
   const isImage = (fileType: string) => fileType.startsWith("image/");
 
+  // FIXED: Download function with better error handling
   const handleDownload = async (url: string, name: string) => {
     try {
-      const res = await fetch(url);
+      // Check if URL is valid
+      if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+        // If it's a blob URL or data URL, use it directly
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        return;
+      }
+
+      // For external URLs, try to fetch with credentials
+      const res = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Accept': '*/*',
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`);
+      }
+
       const blob = await res.blob();
+      const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      a.href = downloadUrl;
       a.download = name;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (err) {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err: any) {
       console.error("Download error:", err);
+      
+      // Fallback: open in new tab if download fails
+      try {
+        window.open(url, '_blank');
+      } catch (fallbackErr) {
+        alert(`Unable to download file: ${err.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -712,8 +917,20 @@ export default function ChatArea({
                                 <p className="text-xs text-gray-500">{(file.fileSize / 1024).toFixed(1)} KB</p>
                               </div>
                               <div className="flex gap-1">
-                                <button onClick={() => window.open(file.fileUrl, "_blank")}><Eye size={14} /></button>
-                                <button onClick={() => handleDownload(file.fileUrl, file.fileName)}><Download size={14} /></button>
+                                <button 
+                                  onClick={() => window.open(file.fileUrl, "_blank")}
+                                  className="hover:text-blue-600 transition-colors"
+                                  title="View file"
+                                >
+                                  <Eye size={14} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDownload(file.fileUrl, file.fileName)}
+                                  className="hover:text-green-600 transition-colors"
+                                  title="Download file"
+                                >
+                                  <Download size={14} />
+                                </button>
                               </div>
                             </div>
                           )}
@@ -803,42 +1020,57 @@ export default function ChatArea({
         to={conversation.id}
       />
 
-      {/* REPORT POPUP MODAL - Same position as before */}
+      {/* REPORT POPUP MODAL - CHAT SCREEN PER KHULEGA */}
       {isReportOpen && (
-<div className="absolute inset-0 bg-black/30 flex items-center justify-center z-40 p-4">
-<div className="bg-white rounded-xl w-full max-w-md shadow-xl relative">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Report User
-              </h3>
-              <button
+        <div className="absolute inset-0 bg-white bg-opacity-100 z-50 flex flex-col">
+          {/* Modal Header - Chat Screen wali header ke niche */}
+          <div className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button 
                 onClick={() => setIsReportOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl"
-                disabled={isSubmittingReport}
+                className="text-gray-600 hover:text-gray-800"
               >
-                ✕
+                ←
               </button>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Report User</h3>
+                <p className="text-sm text-gray-500">Reporting: {conversation.name}</p>
+              </div>
             </div>
+            <button
+              onClick={() => setIsReportOpen(false)}
+              className="p-2 rounded-full hover:bg-gray-100"
+              disabled={isSubmittingReport}
+            >
+              <X size={20} />
+            </button>
+          </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-4">
+          {/* Modal Body - Full screen chat area ki jagah */}
+          <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+            <div className="max-w-2xl mx-auto space-y-6">
               {reportSuccess ? (
-                <div className="bg-green-50 text-green-700 p-4 rounded text-center">
-                  <div className="text-lg font-semibold mb-2">✓ Report Submitted Successfully!</div>
-                  <p>Your report has been received and will be reviewed by our team.</p>
+                <div className="bg-green-50 text-green-700 p-6 rounded-lg text-center mt-10">
+                  <div className="text-xl font-semibold mb-3">✓ Report Submitted Successfully!</div>
+                  <p className="text-sm">Your report has been received and will be reviewed by our team.</p>
+                  <button
+                    onClick={() => setIsReportOpen(false)}
+                    className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                  >
+                    Close
+                  </button>
                 </div>
               ) : (
                 <>
                   {/* Title/Reason */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div className="bg-white p-5 rounded-lg shadow-sm border">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Reason for Report *
                     </label>
                     <select
                       value={reportTitle}
                       onChange={(e) => setReportTitle(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm"
                       required
                       disabled={isSubmittingReport}
                     >
@@ -853,39 +1085,45 @@ export default function ChatArea({
                   </div>
 
                   {/* Description */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div className="bg-white p-5 rounded-lg shadow-sm border">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Description *
                     </label>
                     <textarea
                       value={reportDescription}
                       onChange={(e) => setReportDescription(e.target.value)}
                       placeholder="Please provide detailed information about the issue..."
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      rows={5}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm resize-none"
                       required
                       disabled={isSubmittingReport}
                     />
                   </div>
 
                   {/* Image Upload */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div className="bg-white p-5 rounded-lg shadow-sm border">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Attach Proof Images (Optional)
                     </label>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={(e) => setReportImages(Array.from(e.target.files || []))}
-                      className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                      disabled={isSubmittingReport}
-                    />
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-300 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => setReportImages(Array.from(e.target.files || []))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        disabled={isSubmittingReport}
+                      />
+                      <div className="text-gray-500">
+                        <p className="text-sm font-medium mb-1">Drag & drop or click to upload</p>
+                        <p className="text-xs">PNG, JPG, GIF up to 5MB each</p>
+                      </div>
+                    </div>
 
                     {reportImages.length > 0 && (
-                      <div className="mt-2 flex gap-2 flex-wrap">
+                      <div className="mt-4 flex gap-3 flex-wrap">
                         {reportImages.map((img, i) => (
-                          <div key={i} className="relative w-16 h-16 rounded overflow-hidden border group">
+                          <div key={i} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 group">
                             <img
                               src={URL.createObjectURL(img)}
                               className="w-full h-full object-cover"
@@ -893,7 +1131,7 @@ export default function ChatArea({
                             />
                             <button
                               onClick={() => setReportImages(reportImages.filter((_, idx) => idx !== i))}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow hover:bg-red-600 transition-colors"
                               disabled={isSubmittingReport}
                             >
                               ✕
@@ -903,15 +1141,24 @@ export default function ChatArea({
                       </div>
                     )}
                   </div>
+
+                  {/* Important Note */}
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                    <p className="text-sm text-yellow-800">
+                      <span className="font-semibold">Note:</span> False reporting may result in account suspension. Please provide accurate information.
+                    </p>
+                  </div>
                 </>
               )}
             </div>
+          </div>
 
-            {/* Modal Footer */}
-            <div className="flex justify-end space-x-3 p-6 border-t">
+          {/* Modal Footer - Fixed at bottom */}
+          <div className="border-t bg-white p-4">
+            <div className="max-w-2xl mx-auto flex justify-between items-center">
               <button
                 onClick={() => setIsReportOpen(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition"
+                className="px-5 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium text-sm"
                 disabled={isSubmittingReport}
               >
                 Cancel
@@ -920,9 +1167,16 @@ export default function ChatArea({
                 <button
                   onClick={handleSubmitReport}
                   disabled={isSubmittingReport || !reportTitle.trim() || !reportDescription.trim()}
-                  className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded transition disabled:opacity-50"
+                  className="px-5 py-2.5 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {isSubmittingReport ? 'Submitting...' : 'Submit Report'}
+                  {isSubmittingReport ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Report'
+                  )}
                 </button>
               )}
             </div>
