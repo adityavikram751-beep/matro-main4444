@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Socket } from "socket.io-client";
 import Image from "next/image";
 import MessageInput from "./MessageInput";
-import { Eye, Download, FileText, MoreVertical, Flag, X } from "lucide-react";
+import { Eye, Download, FileText, MoreVertical, Flag, X, Phone, Video, PhoneOff } from "lucide-react";
 import { Conversation, Message, MessageFile, SocketMessage } from "@/types/chat";
 
 interface User {
@@ -63,6 +63,12 @@ export default function ChatArea({
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
+  // Calling States
+  const [isCalling, setIsCalling] = useState(false);
+  const [isVideoCalling, setIsVideoCalling] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'ringing' | 'connected' | 'ended'>('idle');
+
   // Report Modal States
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportTitle, setReportTitle] = useState("");
@@ -86,11 +92,118 @@ export default function ChatArea({
 
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
 
+  // HELPER FUNCTIONS
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString([], { 
+      hour: "2-digit", 
+      minute: "2-digit",
+      hour12: true 
+    });
+  };
+
+  const isImage = (fileType: string) => fileType.startsWith("image/");
+
+  const handleDownload = async (url: string, name: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      console.error("Download error:", err);
+    }
+  };
+
+  // Initialize socket listeners for calling
+  useEffect(() => {
+    if (!socket || !currentUser) return;
+
+    // Handle incoming voice call
+    const handleIncomingVoiceCall = (data: any) => {
+      if (data.to === currentUser._id) {
+        setIncomingCall({
+          from: data.from,
+          type: 'voice',
+          callerName: data.callerName || 'Someone',
+          callId: data.callId
+        });
+        setCallStatus('ringing');
+        
+        // Play ringtone
+        playRingtone();
+      }
+    };
+
+    // Handle incoming video call
+    const handleIncomingVideoCall = (data: any) => {
+      if (data.to === currentUser._id) {
+        setIncomingCall({
+          from: data.from,
+          type: 'video',
+          callerName: data.callerName || 'Someone',
+          callId: data.callId
+        });
+        setCallStatus('ringing');
+        
+        // Play ringtone
+        playRingtone();
+      }
+    };
+
+    // Handle call accepted
+    const handleCallAccepted = (data: any) => {
+      if (data.to === currentUser._id && data.callId === incomingCall?.callId) {
+        setCallStatus('connected');
+        stopRingtone();
+      }
+    };
+
+    // Handle call rejected
+    const handleCallRejected = (data: any) => {
+      if (data.to === currentUser._id) {
+        setCallStatus('ended');
+        setIncomingCall(null);
+        setIsCalling(false);
+        setIsVideoCalling(false);
+        stopRingtone();
+        alert("Call was rejected");
+      }
+    };
+
+    // Handle call ended
+    const handleCallEnded = (data: any) => {
+      if (data.to === currentUser._id || data.from === currentUser._id) {
+        setCallStatus('ended');
+        setIncomingCall(null);
+        setIsCalling(false);
+        setIsVideoCalling(false);
+        stopRingtone();
+      }
+    };
+
+    socket.on("incoming-voice-call", handleIncomingVoiceCall);
+    socket.on("incoming-video-call", handleIncomingVideoCall);
+    socket.on("call-accepted", handleCallAccepted);
+    socket.on("call-rejected", handleCallRejected);
+    socket.on("call-ended", handleCallEnded);
+
+    return () => {
+      socket.off("incoming-voice-call", handleIncomingVoiceCall);
+      socket.off("incoming-video-call", handleIncomingVideoCall);
+      socket.off("call-accepted", handleCallAccepted);
+      socket.off("call-rejected", handleCallRejected);
+      socket.off("call-ended", handleCallEnded);
+    };
+  }, [socket, currentUser, incomingCall]);
+
+  // Original socket listeners for messages
   useEffect(() => {
     if (!socket || !currentUser || !conversation) return;
 
     const handleSentMessage = (msg: SocketMessage) => {
-
       if (msg.receiverId !== conversation.id) return;
 
       setMessages((prev) => {
@@ -131,7 +244,6 @@ export default function ChatArea({
     };
 
     const handleIncomingMessage = (msg: SocketMessage) => {
-
       if (msg.senderId === currentUser._id) {
         return;
       }
@@ -189,6 +301,112 @@ export default function ChatArea({
     };
   }, [socket, currentUser, conversation]);
 
+  // Ringtone functions
+  const playRingtone = () => {
+    try {
+      const audio = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-phone-ring-2935.mp3");
+      audio.loop = true;
+      audio.play().catch(e => console.log("Autoplay prevented:", e));
+      return audio;
+    } catch (error) {
+      console.log("Ringtone error:", error);
+    }
+  };
+
+  const stopRingtone = () => {
+    const audioElements = document.getElementsByTagName('audio');
+    for (let audio of audioElements) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  };
+
+  // Call Functions
+  const startVoiceCall = () => {
+    if (!currentUser || !conversation.id || blockStatus.blockedMe || blockStatus.iBlocked) return;
+    
+    const callId = `call-${Date.now()}-${currentUser._id}`;
+    
+    socket.emit("start-voice-call", {
+      from: currentUser._id,
+      to: conversation.id,
+      callId,
+      callerName: `${currentUser.firstName} ${currentUser.lastName}`
+    });
+
+    setIsCalling(true);
+    setCallStatus('calling');
+  };
+
+  const startVideoCall = () => {
+    if (!currentUser || !conversation.id || blockStatus.blockedMe || blockStatus.iBlocked) return;
+    
+    const callId = `videocall-${Date.now()}-${currentUser._id}`;
+    
+    socket.emit("start-video-call", {
+      from: currentUser._id,
+      to: conversation.id,
+      callId,
+      callerName: `${currentUser.firstName} ${currentUser.lastName}`
+    });
+
+    setIsVideoCalling(true);
+    setCallStatus('calling');
+  };
+
+  const acceptCall = () => {
+    if (!incomingCall || !currentUser) return;
+    
+    socket.emit("accept-call", {
+      from: currentUser._id,
+      to: incomingCall.from,
+      callId: incomingCall.callId,
+      type: incomingCall.type
+    });
+
+    setCallStatus('connected');
+    stopRingtone();
+    
+    if (incomingCall.type === 'video') {
+      setIsVideoCalling(true);
+    } else {
+      setIsCalling(true);
+    }
+  };
+
+  const rejectCall = () => {
+    if (!incomingCall || !currentUser) return;
+    
+    socket.emit("reject-call", {
+      from: currentUser._id,
+      to: incomingCall.from,
+      callId: incomingCall.callId
+    });
+
+    setCallStatus('ended');
+    setIncomingCall(null);
+    stopRingtone();
+  };
+
+  const endCall = () => {
+    const otherUserId = isCalling || isVideoCalling ? conversation.id : incomingCall?.from;
+    const callType = isVideoCalling ? 'video' : 'voice';
+    
+    socket.emit("end-call", {
+      from: currentUser?._id,
+      to: otherUserId,
+      callId: incomingCall?.callId || `call-${Date.now()}`,
+      type: callType
+    });
+
+    setCallStatus('ended');
+    setIncomingCall(null);
+    setIsCalling(false);
+    setIsVideoCalling(false);
+    stopRingtone();
+  };
+
+  // Rest of your existing useEffect hooks
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest(".message-bubble")) {
@@ -282,73 +500,106 @@ export default function ChatArea({
     fetchOnlineStatus();
   }, [conversation.id]);
 
- const onSendMessage = async (text: string, files?: File[]) => {
-  if (!currentUser || !conversation.id) return;
-  if (!text.trim() && (!files || files.length === 0)) return;
+  const onSendMessage = async (text: string, files?: File[]) => {
+    if (!currentUser || !conversation.id) return;
+    if (!text.trim() && (!files || files.length === 0)) return;
 
-  const token = localStorage.getItem("authToken");
-  const tempId = "temp-" + Date.now();
+    const token = localStorage.getItem("authToken");
+    const tempId = "temp-" + Date.now();
 
-  const localFiles =
-    files?.length
-      ? files.map((file) => ({
-          fileName: file.name,
-          fileUrl: URL.createObjectURL(file),
-          fileType: file.type,
-          fileSize: file.size,
-        }))
-      : [];
+    const localFiles =
+      files?.length
+        ? files.map((file) => ({
+            fileName: file.name,
+            fileUrl: URL.createObjectURL(file),
+            fileType: file.type,
+            fileSize: file.size,
+          }))
+        : [];
 
-  // ✅ Optimistic UI (ONE TIME ONLY)
-  setMessages((prev) => [
-    ...prev,
-    {
-      id: tempId,
-      senderId: currentUser._id,
-      receiverId: conversation.id,
-      text,
-      timestamp: new Date().toISOString(),
-      sender: "me",
-      avatar: currentUser.profileImage,
-      files: localFiles,
-    },
-  ]);
+    // ✅ Optimistic UI (ONE TIME ONLY)
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        senderId: currentUser._id,
+        receiverId: conversation.id,
+        text,
+        timestamp: new Date().toISOString(),
+        sender: "me",
+        avatar: currentUser.profileImage,
+        files: localFiles,
+      },
+    ]);
 
-  scrollToBottom();
+    scrollToBottom();
 
-  try {
-    // ==============================
-    // 📌 FILE MESSAGE
-    // ==============================
-    if (files && files.length > 0) {
-      const formData = new FormData();
-      formData.append("receiverId", conversation.id);
+    try {
+      // ==============================
+      // 📌 FILE MESSAGE
+      // ==============================
+      if (files && files.length > 0) {
+        const formData = new FormData();
+        formData.append("receiverId", conversation.id);
 
-      if (replyingMessage?.id) {
-        formData.append("replyToId", replyingMessage.id);
+        if (replyingMessage?.id) {
+          formData.append("replyToId", replyingMessage.id);
+        }
+
+        files.forEach((file) => {
+          formData.append("file", file);
+        });
+
+        // ✅ SOCKET ONLY FOR FILE
+        socket.emit("send-msg", {
+          tempId,
+          from: currentUser._id,
+          to: conversation.id,
+          messageText: text,
+          replyToId: replyingMessage?.id || null,
+        });
+
+        const res = await fetch(
+          "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+          }
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === tempId
+                ? mapSocketToMessage(data.data, currentUser, conversation)
+                : m
+            )
+          );
+        }
+        return;
       }
 
-      files.forEach((file) => {
-        formData.append("file", file);
-      });
-
-      // ✅ SOCKET ONLY FOR FILE
-      socket.emit("send-msg", {
-        tempId,
-        from: currentUser._id,
-        to: conversation.id,
-        messageText: text,
-        replyToId: replyingMessage?.id || null,
-      });
-
+      // ==============================
+      // 📌 TEXT MESSAGE (API ONLY)
+      // ==============================
       const res = await fetch(
-        "https://matrimonial-backend-7ahc.onrender.com/api/message/send-file",
+        "https://matrimonial-backend-7ahc.onrender.com/api/message",
         {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
-          body: formData,
+          body: JSON.stringify({
+            receiverId: conversation.id,
+            messageText: text,
+            replyToId: replyingMessage?.id || null,
+          }),
         }
       );
 
@@ -363,46 +614,12 @@ export default function ChatArea({
           )
         );
       }
-      return;
+    } catch (err) {
+      console.error("Send message error:", err);
+    } finally {
+      setReplyingMessage(null);
     }
-
-    // ==============================
-    // 📌 TEXT MESSAGE (API ONLY)
-    // ==============================
-    const res = await fetch(
-      "https://matrimonial-backend-7ahc.onrender.com/api/message",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          receiverId: conversation.id,
-          messageText: text,
-          replyToId: replyingMessage?.id || null,
-        }),
-      }
-    );
-
-    const data = await res.json();
-
-    if (data.success) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === tempId
-            ? mapSocketToMessage(data.data, currentUser, conversation)
-            : m
-        )
-      );
-    }
-  } catch (err) {
-    console.error("Send message error:", err);
-  } finally {
-    setReplyingMessage(null);
-  }
-};
-
+  };
 
   const handleBlockUser = async () => {
     if (!conversation.id) return;
@@ -529,8 +746,8 @@ export default function ChatArea({
 
     try {
       const token = localStorage.getItem("authToken");
-      const reporterId = currentUser?._id; // Current logged in user
-      const reportedUserId = conversation.id; // User being reported
+      const reporterId = currentUser?._id;
+      const reportedUserId = conversation.id;
 
       if (!reporterId) {
         alert("Please login to submit report");
@@ -543,7 +760,6 @@ export default function ChatArea({
       formData.append("title", reportTitle);
       formData.append("description", reportDescription);
 
-      // Add images if any
       reportImages.forEach((img, index) => {
         formData.append("image", img);
       });
@@ -554,7 +770,6 @@ export default function ChatArea({
           method: "POST",
           headers: { 
             "Authorization": `Bearer ${token}`,
-            // Don't set Content-Type for FormData, browser sets it automatically
           },
           body: formData,
         }
@@ -565,7 +780,6 @@ export default function ChatArea({
 
       if (data.success) {
         setReportSuccess(true);
-        // Reset form after success
         setTimeout(() => {
           setIsReportOpen(false);
           setReportTitle("");
@@ -584,28 +798,9 @@ export default function ChatArea({
     }
   };
 
-  const formatTime = (timestamp: string) =>
-    new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-  const isImage = (fileType: string) => fileType.startsWith("image/");
-
-  const handleDownload = async (url: string, name: string) => {
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (err) {
-      console.error("Download error:", err);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header */}
+      {/* Header with Call Buttons */}
       <div
         className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between relative
                    max-md:fixed max-md:top-[56px] max-md:left-0 max-md:right-0 max-md:z-40"
@@ -639,54 +834,148 @@ export default function ChatArea({
           </div>
         </div>
 
-        <div className="relative">
+        <div className="flex items-center space-x-2">
+          {/* Voice Call Button */}
           <button
-            onClick={() => setHeaderMenuOpen((prev) => !prev)}
-            className="p-2 rounded-full hover:bg-gray-100"
+            onClick={startVoiceCall}
+            disabled={blockStatus.blockedMe || blockStatus.iBlocked || !conversationOnline}
+            className={`p-2 rounded-full ${blockStatus.blockedMe || blockStatus.iBlocked || !conversationOnline
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-green-100 text-green-600 hover:bg-green-200'
+              }`}
+            title="Voice Call"
           >
-            <MoreVertical size={20} />
+            <Phone size={20} />
           </button>
 
-          {headerMenuOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
-              {/* REPORT BUTTON */}
-              <button
-                onClick={() => {
-                  setIsReportOpen(true);
-                  setHeaderMenuOpen(false);
-                }}
-                className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
-              >
-                <Flag size={16} className="mr-2" />
-                Report User
-              </button>
+          {/* Video Call Button */}
+          <button
+            onClick={startVideoCall}
+            disabled={blockStatus.blockedMe || blockStatus.iBlocked || !conversationOnline}
+            className={`p-2 rounded-full ${blockStatus.blockedMe || blockStatus.iBlocked || !conversationOnline
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+              }`}
+            title="Video Call"
+          >
+            <Video size={20} />
+          </button>
 
-              {!blockStatus.iBlocked ? (
-                <button
-                  onClick={handleBlockUser}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                >
-                  Block User
-                </button>
-              ) : (
-                <button
-                  onClick={handleUnblockUser}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-yellow-700"
-                >
-                  Unblock
-                </button>
-              )}
+          {/* More Options Button */}
+          <div className="relative">
+            <button
+              onClick={() => setHeaderMenuOpen((prev) => !prev)}
+              className="p-2 rounded-full hover:bg-gray-100"
+            >
+              <MoreVertical size={20} />
+            </button>
 
-              <button
-                onClick={handleDeleteAllChat}
-                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-500"
-              >
-                Delete Chat
-              </button>
-            </div>
-          )}
+            {headerMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+                <button
+                  onClick={() => {
+                    setIsReportOpen(true);
+                    setHeaderMenuOpen(false);
+                  }}
+                  className="flex items-center w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
+                >
+                  <Flag size={16} className="mr-2" />
+                  Report User
+                </button>
+
+                {!blockStatus.iBlocked ? (
+                  <button
+                    onClick={handleBlockUser}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  >
+                    Block User
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleUnblockUser}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-yellow-700"
+                  >
+                    Unblock
+                  </button>
+                )}
+
+                <button
+                  onClick={handleDeleteAllChat}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-500"
+                >
+                  Delete Chat
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Incoming Call Modal */}
+      {incomingCall && callStatus === 'ringing' && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl p-6 text-center">
+            <div className="mb-4">
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Phone size={32} className="text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold">Incoming {incomingCall.type === 'video' ? 'Video' : 'Voice'} Call</h3>
+              <p className="text-gray-600 mt-1">{incomingCall.callerName} is calling...</p>
+            </div>
+            
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={rejectCall}
+                className="px-6 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 flex items-center"
+              >
+                <PhoneOff size={18} className="mr-2" />
+                Decline
+              </button>
+              <button
+                onClick={acceptCall}
+                className="px-6 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 flex items-center"
+              >
+                <Phone size={18} className="mr-2" />
+                Accept
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Call Modal */}
+      {(isCalling || isVideoCalling || callStatus === 'connected') && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl p-6 text-center">
+            <div className="mb-4">
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                {isVideoCalling ? (
+                  <Video size={32} className="text-blue-600" />
+                ) : (
+                  <Phone size={32} className="text-blue-600" />
+                )}
+              </div>
+              <h3 className="text-xl font-semibold">
+                {isVideoCalling ? 'Video Call' : 'Voice Call'} {callStatus === 'calling' ? 'Calling...' : 'Connected'}
+              </h3>
+              <p className="text-gray-600 mt-1">With {conversation.name}</p>
+              <p className="text-sm text-gray-500 mt-2">
+                {callStatus === 'calling' ? 'Waiting for answer...' : 'Call in progress'}
+              </p>
+            </div>
+            
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={endCall}
+                className="px-6 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 flex items-center"
+              >
+                <PhoneOff size={18} className="mr-2" />
+                End Call
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div
@@ -824,17 +1113,16 @@ export default function ChatArea({
             : undefined
         }
         onCancelReply={() => setReplyingMessage(null)}
-        disabled={blockStatus.blockedMe || blockStatus.iBlocked}
+        disabled={blockStatus.blockedMe || blockStatus.iBlocked || isCalling || isVideoCalling}
         socket={socket}
         currentUser={currentUser}
         to={conversation.id}
       />
 
-      {/* REPORT POPUP MODAL - Same position as before */}
+      {/* REPORT POPUP MODAL */}
       {isReportOpen && (
-<div className="absolute inset-0 bg-black/30 flex items-center justify-center z-40 p-4">
-<div className="bg-white rounded-xl w-full max-w-md shadow-xl relative">
-            {/* Modal Header */}
+        <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl relative">
             <div className="flex items-center justify-between p-6 border-b">
               <h3 className="text-lg font-semibold text-gray-900">
                 Report User
@@ -848,7 +1136,6 @@ export default function ChatArea({
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-4">
               {reportSuccess ? (
                 <div className="bg-green-50 text-green-700 p-4 rounded text-center">
@@ -857,7 +1144,6 @@ export default function ChatArea({
                 </div>
               ) : (
                 <>
-                  {/* Title/Reason */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Reason for Report *
@@ -879,7 +1165,6 @@ export default function ChatArea({
                     </select>
                   </div>
 
-                  {/* Description */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Description *
@@ -895,7 +1180,6 @@ export default function ChatArea({
                     />
                   </div>
 
-                  {/* Image Upload */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Attach Proof Images (Optional)
@@ -934,7 +1218,6 @@ export default function ChatArea({
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="flex justify-end space-x-3 p-6 border-t">
               <button
                 onClick={() => setIsReportOpen(false)}
