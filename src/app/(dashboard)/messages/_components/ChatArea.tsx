@@ -66,7 +66,12 @@ export default function ChatArea({
   // WebRTC Calling States
   const [isCalling, setIsCalling] = useState(false);
   const [isVideoCalling, setIsVideoCalling] = useState(false);
-  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [incomingCall, setIncomingCall] = useState<{
+    from: string;
+    type: 'audio' | 'video';
+    callMessageId: string;
+    offer?: RTCSessionDescriptionInit;
+  } | null>(null);
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'ringing' | 'connected' | 'ended'>('idle');
   const [callMessageId, setCallMessageId] = useState<string | null>(null);
   
@@ -81,6 +86,8 @@ export default function ChatArea({
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const callTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [callDuration, setCallDuration] = useState(0);
 
   // Report Modal States
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -140,7 +147,7 @@ export default function ChatArea({
   const handleScroll = () => setShouldAutoScroll(isAtBottom());
 
   // ============================
-  // WEBRTC FUNCTIONS
+  // FIXED WEBRTC FUNCTIONS
   // ============================
 
   // Initialize local media
@@ -161,6 +168,7 @@ export default function ChatArea({
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        localVideoRef.current.muted = true;
       }
       
       return stream;
@@ -173,61 +181,126 @@ export default function ChatArea({
 
   // Create RTCPeerConnection
   const createPeerConnection = () => {
-    const configuration = {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" }
-      ]
-    };
+    try {
+      const configuration = {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" },
+          { urls: "stun:stun3.l.google.com:19302" },
+          { urls: "stun:stun4.l.google.com:19302" }
+        ]
+      };
 
-    const pc = new RTCPeerConnection(configuration);
-    peerConnectionRef.current = pc;
+      const pc = new RTCPeerConnection(configuration);
+      peerConnectionRef.current = pc;
 
-    // Add local stream
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, localStreamRef.current!);
-      });
-    }
-
-    // Handle remote stream
-    pc.ontrack = (event) => {
-      const stream = event.streams[0];
-      setRemoteStream(stream);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-      }
-    };
-
-    // ICE candidate handling
-    pc.onicecandidate = (event) => {
-      if (event.candidate && incomingCall?.from) {
-        socket.emit("webrtc-ice-candidate", {
-          to: incomingCall.from,
-          candidate: event.candidate
+      // Add local stream tracks
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => {
+          pc.addTrack(track, localStreamRef.current!);
+          console.log("Added track:", track.kind);
         });
       }
-    };
 
-    return pc;
+      // Handle remote stream
+      pc.ontrack = (event) => {
+        console.log("Remote track received:", event.track.kind);
+        const stream = event.streams[0];
+        if (!stream) return;
+        
+        setRemoteStream(stream);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = stream;
+        }
+      };
+
+      // ICE candidate handling
+      pc.onicecandidate = (event) => {
+        console.log("ICE candidate:", event.candidate);
+        if (event.candidate) {
+          const targetId = isCalling || isVideoCalling ? conversation.id : incomingCall?.from;
+          if (targetId) {
+            socket.emit("webrtc-ice-candidate", {
+              to: targetId,
+              candidate: event.candidate
+            });
+          }
+        }
+      };
+
+      // Connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log("Connection state:", pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          console.log("✅ Peer connection established!");
+          setCallStatus('connected');
+          stopRingtone();
+        } else if (pc.connectionState === 'disconnected' || 
+                   pc.connectionState === 'failed' || 
+                   pc.connectionState === 'closed') {
+          console.log("❌ Peer connection failed/closed");
+          endCallCleanup();
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log("ICE connection state:", pc.iceConnectionState);
+      };
+
+      return pc;
+    } catch (error) {
+      console.error("Error creating peer connection:", error);
+      return null;
+    }
+  };
+
+  // Start call timer
+  const startCallTimer = () => {
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+    }
+    
+    setCallDuration(0);
+    callTimerRef.current = setInterval(() => {
+      setCallDuration(prev => prev + 1);
+    }, 1000);
+  };
+
+  // Stop call timer
+  const stopCallTimer = () => {
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
   };
 
   // Cleanup function
   const endCallCleanup = () => {
+    console.log("🧹 Cleaning up call...");
+    
     setCallStatus('ended');
     setIncomingCall(null);
     setIsCalling(false);
     setIsVideoCalling(false);
     setCallMessageId(null);
+    stopCallTimer();
     stopRingtone();
     
     // Stop media tracks
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
       localStreamRef.current = null;
     }
     
     if (peerConnectionRef.current) {
+      peerConnectionRef.current.ontrack = null;
+      peerConnectionRef.current.onicecandidate = null;
+      peerConnectionRef.current.onconnectionstatechange = null;
+      peerConnectionRef.current.oniceconnectionstatechange = null;
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
@@ -242,13 +315,16 @@ export default function ChatArea({
       remoteVideoRef.current.srcObject = null;
     }
 
-    // Add call ended message
-    if (currentUser && conversation) {
+    // Reset audio/video states
+    setIsAudioMuted(false);
+    setIsVideoOff(false);
+
+    // Add call ended message if call was connected
+    if (currentUser && conversation && callStatus === 'connected') {
       const callType = isVideoCalling ? 'video' : 'voice';
-      const callDuration = Math.floor((Date.now() - (callStatus === 'connected' ? Date.now() - 5000 : Date.now())) / 1000);
       
       const callMessage: Message = {
-        id: `call-${Date.now()}`,
+        id: `call-ended-${Date.now()}`,
         senderId: currentUser._id,
         receiverId: conversation.id,
         text: `Call ended • ${callDuration}s`,
@@ -270,145 +346,257 @@ export default function ChatArea({
   };
 
   // Ringtone functions
+  let ringtoneAudio: HTMLAudioElement | null = null;
+
   const playRingtone = () => {
     try {
-      const audio = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-phone-ring-2935.mp3");
-      audio.loop = true;
-      audio.play().catch(e => console.log("Autoplay prevented:", e));
-      return audio;
+      if (ringtoneAudio) {
+        ringtoneAudio.pause();
+        ringtoneAudio.currentTime = 0;
+      }
+      
+      ringtoneAudio = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-phone-ring-2935.mp3");
+      ringtoneAudio.loop = true;
+      ringtoneAudio.play().catch(e => console.log("Ringtone autoplay prevented:", e));
     } catch (error) {
       console.log("Ringtone error:", error);
     }
   };
 
   const stopRingtone = () => {
-    const audioElements = document.getElementsByTagName('audio');
-    for (let audio of audioElements) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (ringtoneAudio) {
+      ringtoneAudio.pause();
+      ringtoneAudio.currentTime = 0;
+      ringtoneAudio = null;
     }
   };
 
   // ============================
-  // CALL CONTROL FUNCTIONS
+  // CALL INITIATION FUNCTIONS
   // ============================
 
   const startVoiceCall = async () => {
-    if (!currentUser || !conversation.id || blockStatus.blockedMe || blockStatus.iBlocked) return;
+    if (!currentUser || !conversation.id || blockStatus.blockedMe || blockStatus.iBlocked) {
+      alert("Cannot call blocked user");
+      return;
+    }
     
+    console.log("🎤 Starting voice call to:", conversation.id);
+    
+    // Cleanup any existing call
+    endCallCleanup();
+    
+    // Initialize local audio
     const stream = await initLocalMedia(false);
-    if (!stream) return;
+    if (!stream) {
+      alert("Could not access microphone");
+      return;
+    }
     
-    socket.emit("call-user", {
-      from: currentUser._id,
-      to: conversation.id,
-      callType: "audio"
-    });
+    // Create peer connection
+    const pc = createPeerConnection();
+    if (!pc) {
+      alert("Failed to create connection");
+      return;
+    }
+    
+    // Create offer
+    try {
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false
+      });
+      await pc.setLocalDescription(offer);
+      
+      // Send call request to server
+      socket.emit("call-user", {
+        from: currentUser._id,
+        to: conversation.id,
+        callType: "audio",
+        offer: offer
+      });
 
-    setIsCalling(true);
-    setCallStatus('calling');
+      setIsCalling(true);
+      setCallStatus('calling');
 
-    // Add call started message
-    const callMessage: Message = {
-      id: `call-start-${Date.now()}`,
-      senderId: currentUser._id,
-      receiverId: conversation.id,
-      text: "Voice call started",
-      timestamp: new Date().toISOString(),
-      sender: "system",
-      avatar: "/system-avatar.png",
-      isCall: true,
-      callType: "audio"
-    };
+      // Add call started message
+      const callMessage: Message = {
+        id: `call-start-${Date.now()}`,
+        senderId: currentUser._id,
+        receiverId: conversation.id,
+        text: "Voice call started",
+        timestamp: new Date().toISOString(),
+        sender: "system",
+        avatar: "/system-avatar.png",
+        isCall: true,
+        callType: "audio"
+      };
 
-    setMessages(prev => [...prev, callMessage]);
+      setMessages(prev => [...prev, callMessage]);
+      
+    } catch (error) {
+      console.error("Error creating offer:", error);
+      endCallCleanup();
+    }
   };
 
   const startVideoCall = async () => {
-    if (!currentUser || !conversation.id || blockStatus.blockedMe || blockStatus.iBlocked) return;
-    
-    const stream = await initLocalMedia(true);
-    if (!stream) return;
-    
-    socket.emit("call-user", {
-      from: currentUser._id,
-      to: conversation.id,
-      callType: "video"
-    });
-
-    setIsVideoCalling(true);
-    setCallStatus('calling');
-
-    // Add call started message
-    const callMessage: Message = {
-      id: `call-start-${Date.now()}`,
-      senderId: currentUser._id,
-      receiverId: conversation.id,
-      text: "Video call started",
-      timestamp: new Date().toISOString(),
-      sender: "system",
-      avatar: "/system-avatar.png",
-      isCall: true,
-      callType: "video"
-    };
-
-    setMessages(prev => [...prev, callMessage]);
-  };
-
-  const acceptCall = async () => {
-    if (!incomingCall || !currentUser || !callMessageId) return;
-    
-    const isVideo = incomingCall.type === 'video';
-    const stream = await initLocalMedia(isVideo);
-    if (!stream) return;
-    
-    socket.emit("accept-call", {
-      callMessageId,
-      from: currentUser._id,
-      to: incomingCall.from
-    });
-
-    setCallStatus('connected');
-    stopRingtone();
-    
-    if (isVideo) {
-      setIsVideoCalling(true);
-    } else {
-      setIsCalling(true);
+    if (!currentUser || !conversation.id || blockStatus.blockedMe || blockStatus.iBlocked) {
+      alert("Cannot call blocked user");
+      return;
     }
-
-    // Add call accepted message
-    const callMessage: Message = {
-      id: `call-accepted-${Date.now()}`,
-      senderId: currentUser._id,
-      receiverId: conversation.id,
-      text: "Call accepted",
-      timestamp: new Date().toISOString(),
-      sender: "system",
-      avatar: "/system-avatar.png",
-      isCall: true,
-      callType: incomingCall.type
-    };
-
-    setMessages(prev => [...prev, callMessage]);
-
+    
+    console.log("🎥 Starting video call to:", conversation.id);
+    
+    // Cleanup any existing call
+    endCallCleanup();
+    
+    // Initialize local video
+    const stream = await initLocalMedia(true);
+    if (!stream) {
+      alert("Could not access camera/microphone");
+      return;
+    }
+    
     // Create peer connection
     const pc = createPeerConnection();
+    if (!pc) {
+      alert("Failed to create connection");
+      return;
+    }
     
-    // Create and send answer if this is incoming call
-    if (incomingCall) {
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      
-      socket.emit("webrtc-answer", {
-        to: incomingCall.from,
-        answer
+    // Create offer
+    try {
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
       });
+      await pc.setLocalDescription(offer);
+      
+      // Send call request to server
+      socket.emit("call-user", {
+        from: currentUser._id,
+        to: conversation.id,
+        callType: "video",
+        offer: offer
+      });
+
+      setIsVideoCalling(true);
+      setCallStatus('calling');
+
+      // Add call started message
+      const callMessage: Message = {
+        id: `call-start-${Date.now()}`,
+        senderId: currentUser._id,
+        receiverId: conversation.id,
+        text: "Video call started",
+        timestamp: new Date().toISOString(),
+        sender: "system",
+        avatar: "/system-avatar.png",
+        isCall: true,
+        callType: "video"
+      };
+
+      setMessages(prev => [...prev, callMessage]);
+      
+    } catch (error) {
+      console.error("Error creating offer:", error);
+      endCallCleanup();
+    }
+  };
+
+  // ============================
+  // CALL RESPONSE FUNCTIONS
+  // ============================
+
+  const acceptCall = async () => {
+    if (!incomingCall || !currentUser) {
+      console.error("No incoming call or user");
+      return;
+    }
+    
+    console.log("✅ Accepting call from:", incomingCall.from);
+    
+    // Initialize local media based on call type
+    const isVideo = incomingCall.type === 'video';
+    const stream = await initLocalMedia(isVideo);
+    if (!stream) {
+      console.error("Failed to get local media");
+      return;
+    }
+    
+    // Create peer connection
+    const pc = createPeerConnection();
+    if (!pc) {
+      console.error("Failed to create peer connection");
+      return;
+    }
+    
+    // Set remote description from offer
+    if (incomingCall.offer) {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
+        console.log("Remote description set successfully");
+        
+        // Create answer
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        
+        // Send answer back to caller
+        socket.emit("accept-call", {
+          callMessageId,
+          from: currentUser._id,
+          to: incomingCall.from,
+          answer: answer
+        });
+        
+        // Send ICE candidates that were gathered before answer
+        setTimeout(() => {
+          if (pc.iceGatheringState === "complete") {
+            console.log("ICE gathering complete");
+          }
+        }, 1000);
+        
+        // Update UI
+        setCallStatus('connected');
+        stopRingtone();
+        startCallTimer();
+        
+        if (isVideo) {
+          setIsVideoCalling(true);
+        } else {
+          setIsCalling(true);
+        }
+        
+        // Add call accepted message
+        const callMessage: Message = {
+          id: `call-accepted-${Date.now()}`,
+          senderId: currentUser._id,
+          receiverId: conversation.id,
+          text: "Call accepted",
+          timestamp: new Date().toISOString(),
+          sender: "system",
+          avatar: "/system-avatar.png",
+          isCall: true,
+          callType: incomingCall.type
+        };
+        
+        setMessages(prev => [...prev, callMessage]);
+        
+      } catch (error) {
+        console.error("Error setting remote description:", error);
+        endCallCleanup();
+      }
+    } else {
+      console.error("No offer found in incoming call");
+      endCallCleanup();
     }
   };
 
   const rejectCall = () => {
-    if (!incomingCall || !currentUser || !callMessageId) return;
+    if (!incomingCall || !currentUser) return;
+    
+    console.log("❌ Rejecting call from:", incomingCall.from);
     
     socket.emit("reject-call", {
       callMessageId,
@@ -434,18 +622,24 @@ export default function ChatArea({
   };
 
   const endCall = () => {
-    if (!callMessageId && !isCalling && !isVideoCalling && !incomingCall) return;
+    console.log("📴 Ending call");
     
     const otherUserId = isCalling || isVideoCalling ? conversation.id : incomingCall?.from;
     
-    socket.emit("end-call", {
-      callMessageId: callMessageId || `call-${Date.now()}`,
-      from: currentUser?._id,
-      to: otherUserId
-    });
-
+    if (otherUserId && currentUser) {
+      socket.emit("end-call", {
+        callMessageId: callMessageId || `call-${Date.now()}`,
+        from: currentUser._id,
+        to: otherUserId
+      });
+    }
+    
     endCallCleanup();
   };
+
+  // ============================
+  // CALL CONTROLS
+  // ============================
 
   const toggleAudio = () => {
     if (localStreamRef.current) {
@@ -454,34 +648,43 @@ export default function ChatArea({
         track.enabled = !track.enabled;
       });
       setIsAudioMuted(!isAudioMuted);
+      console.log("Audio", audioTracks[0]?.enabled ? "unmuted" : "muted");
     }
   };
 
   const toggleVideo = () => {
     if (localStreamRef.current) {
       const videoTracks = localStreamRef.current.getVideoTracks();
-      videoTracks.forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      setIsVideoOff(!isVideoOff);
+      if (videoTracks.length > 0) {
+        videoTracks.forEach(track => {
+          track.enabled = !track.enabled;
+        });
+        setIsVideoOff(!isVideoOff);
+        console.log("Video", videoTracks[0]?.enabled ? "on" : "off");
+      }
     }
   };
 
   // ============================
-  // SOCKET EVENT HANDLERS
+  // SOCKET EVENT HANDLERS - FIXED
   // ============================
 
   useEffect(() => {
     if (!socket || !currentUser) return;
 
-    // Handle incoming call
+    console.log("📡 Setting up socket listeners for WebRTC");
+
+    // Handle incoming call with offer
     const handleIncomingCall = (data: any) => {
-      console.log("📞 Incoming call:", data);
-      if (data.from === conversation.id) {
+      console.log("📞 Incoming call received:", data);
+      
+      // Check if this call is for current conversation
+      if (data.from === conversation.id && !isCalling && !isVideoCalling) {
         setIncomingCall({
           from: data.from,
           type: data.callType,
-          callMessageId: data.callMessageId
+          callMessageId: data.callMessageId,
+          offer: data.offer
         });
         setCallMessageId(data.callMessageId);
         setCallStatus('ringing');
@@ -506,65 +709,84 @@ export default function ChatArea({
       }
     };
 
-    // Handle call accepted
-    const handleCallAccepted = (data: any) => {
-      console.log("✅ Call accepted:", data);
-      if (data.by === conversation.id) {
-        setCallStatus('connected');
-        stopRingtone();
+    // Handle call accepted with answer
+    const handleCallAccepted = async (data: any) => {
+      console.log("✅ Call accepted by receiver:", data);
+      
+      // Check if we're the caller and this is our call
+      if (data.by === conversation.id && (isCalling || isVideoCalling)) {
+        try {
+          const pc = peerConnectionRef.current;
+          if (pc && data.answer) {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            console.log("Remote answer set successfully");
+            setCallStatus('connected');
+            stopRingtone();
+            startCallTimer();
+          }
+        } catch (error) {
+          console.error("Error setting remote answer:", error);
+        }
       }
     };
 
     // Handle call rejected
     const handleCallRejected = (data: any) => {
       console.log("❌ Call rejected:", data);
-      if (data.by === conversation.id) {
-        endCallCleanup();
+      if (data.by === conversation.id && (isCalling || isVideoCalling)) {
         alert("Call was rejected");
+        endCallCleanup();
       }
     };
 
     // Handle call ended
     const handleCallEnded = (data: any) => {
       console.log("📴 Call ended:", data);
-      if (data.by === conversation.id || incomingCall?.from === conversation.id) {
+      if (data.by === conversation.id || (incomingCall?.from === conversation.id)) {
+        alert("Call ended by other user");
         endCallCleanup();
       }
     };
 
-    // WebRTC Signaling
-    const handleWebRTCOffer = async (offer: RTCSessionDescriptionInit) => {
-      console.log("📡 Received WebRTC offer");
-      if (!incomingCall) return;
-      
-      const pc = createPeerConnection();
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      
-      socket.emit("webrtc-answer", {
-        to: incomingCall.from,
-        answer
-      });
+    // WebRTC Signaling - For when we're the callee
+    const handleWebRTCOffer = async (data: any) => {
+      console.log("📡 Received WebRTC offer directly:", data);
+      // This is handled in handleIncomingCall already
     };
 
-    const handleWebRTCAnswer = async (answer: RTCSessionDescriptionInit) => {
-      console.log("📡 Received WebRTC answer");
-      const pc = peerConnectionRef.current;
-      if (pc && pc.signalingState !== "closed") {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    const handleWebRTCAnswer = async (data: any) => {
+      console.log("📡 Received WebRTC answer as caller:", data);
+      
+      if (data.from === conversation.id && peerConnectionRef.current) {
+        try {
+          const pc = peerConnectionRef.current;
+          if (pc.signalingState !== "closed") {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            console.log("Answer processed successfully");
+          }
+        } catch (error) {
+          console.error("Error processing answer:", error);
+        }
       }
     };
 
-    const handleWebRTCICECandidate = async (candidate: RTCIceCandidateInit) => {
-      console.log("📡 Received ICE candidate");
-      const pc = peerConnectionRef.current;
-      if (pc && pc.remoteDescription) {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    const handleWebRTCICECandidate = async (data: any) => {
+      console.log("📡 Received ICE candidate:", data);
+      
+      if (data.from === conversation.id && peerConnectionRef.current) {
+        try {
+          const pc = peerConnectionRef.current;
+          if (pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            console.log("ICE candidate added");
+          }
+        } catch (error) {
+          console.error("Error adding ICE candidate:", error);
+        }
       }
     };
 
+    // Listen for events
     socket.on("incoming-call", handleIncomingCall);
     socket.on("call-accepted", handleCallAccepted);
     socket.on("call-rejected", handleCallRejected);
@@ -574,6 +796,7 @@ export default function ChatArea({
     socket.on("webrtc-ice-candidate", handleWebRTCICECandidate);
 
     return () => {
+      console.log("🧹 Cleaning up socket listeners");
       socket.off("incoming-call", handleIncomingCall);
       socket.off("call-accepted", handleCallAccepted);
       socket.off("call-rejected", handleCallRejected);
@@ -1278,7 +1501,7 @@ export default function ChatArea({
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-2">{conversation.name}</h3>
                   <p className="text-blue-300">
-                    {callStatus === 'calling' ? 'Calling...' : 'Connected'}
+                    {callStatus === 'calling' ? 'Calling...' : `Connected • ${callDuration}s`}
                   </p>
                 </div>
               </div>
@@ -1303,7 +1526,7 @@ export default function ChatArea({
                 <div className={`w-3 h-3 rounded-full ${callStatus === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-yellow-500 animate-ping'}`}></div>
                 <div>
                   <h3 className="font-bold text-lg">
-                    {isVideoCalling ? 'Video Call' : 'Voice Call'} • {callStatus === 'calling' ? 'Calling...' : 'Connected'}
+                    {isVideoCalling ? 'Video Call' : 'Voice Call'} • {callStatus === 'calling' ? 'Calling...' : `Connected ${callDuration}s`}
                   </h3>
                   <p className="text-sm opacity-90">{conversation.name}</p>
                 </div>
