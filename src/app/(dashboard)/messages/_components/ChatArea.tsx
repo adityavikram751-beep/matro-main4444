@@ -299,7 +299,7 @@ export default function ChatArea({
         }))
       : [];
 
-  // 🔹 Optimistic UI
+  // ✅ Optimistic UI (ONE TIME ONLY)
   setMessages((prev) => [
     ...prev,
     {
@@ -323,6 +323,7 @@ export default function ChatArea({
     if (files && files.length > 0) {
       const formData = new FormData();
       formData.append("receiverId", conversation.id);
+
       if (replyingMessage?.id) {
         formData.append("replyToId", replyingMessage.id);
       }
@@ -331,7 +332,7 @@ export default function ChatArea({
         formData.append("file", file);
       });
 
-      // ✅ SOCKET ONLY FOR FILE (UI SYNC)
+      // ✅ SOCKET ONLY FOR FILE
       socket.emit("send-msg", {
         tempId,
         from: currentUser._id,
@@ -366,7 +367,7 @@ export default function ChatArea({
     }
 
     // ==============================
-    // 📌 TEXT ONLY MESSAGE
+    // 📌 TEXT MESSAGE (API ONLY)
     // ==============================
     const res = await fetch(
       "https://matrimonial-backend-7ahc.onrender.com/api/message",
